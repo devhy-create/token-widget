@@ -32,8 +32,8 @@ pub fn build_menu(sh: &Sh) -> tauri::Result<Menu<Wry>> {
     let pinned = CheckMenuItemBuilder::with_id("pinned", "固定展开（不自动收缩）").checked(c.pinned).build(app)?;
     let on_top = CheckMenuItemBuilder::with_id("ontop", "始终置顶").checked(c.on_top).build(app)?;
     let autostart = CheckMenuItemBuilder::with_id("autostart", "开机自启").enabled(settings::can_autostart()).checked(settings::get_autostart(sh)).build(app)?;
-    let pricing = MenuItemBuilder::with_id("pricing", "打开价格配置（pricing.user.json）").build(app)?;
-    let plans = MenuItemBuilder::with_id("plans", "打开套餐配置（plans.user.json）").build(app)?;
+    let pricing = MenuItemBuilder::with_id("pricing", "在资源管理器中显示价格配置（pricing.user.json）").build(app)?;
+    let plans = MenuItemBuilder::with_id("plans", "在资源管理器中显示套餐配置（plans.user.json）").build(app)?;
     let rescan = MenuItemBuilder::with_id("rescan", "重新全量扫描").build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
     MenuBuilder::new(app)
@@ -71,12 +71,13 @@ pub fn create_tray(sh: &Sh) -> tauri::Result<()> {
     Ok(())
 }
 
-/// 用户配置文件不存在时先写一份模板再打开
-fn open_user_file(sh: &Sh, file: std::path::PathBuf, template: serde_json::Value) {
+/// 用户配置文件不存在时先写一份模板，再在资源管理器（访达）里选中它，由用户用自己的编辑器打开。
+/// 不直接“用默认程序打开”：很多电脑没给 .json 关联程序，会悄悄失败；新版记事本有的机器上又打不开 AppData 下的文件。
+fn reveal_user_file(sh: &Sh, file: std::path::PathBuf, template: serde_json::Value) {
     if !file.exists() {
         let _ = std::fs::write(&file, serde_json::to_string_pretty(&template).unwrap_or_default());
     }
-    let _ = sh.app.opener().open_path(file.to_string_lossy(), None::<&str>);
+    let _ = sh.app.opener().reveal_item_in_dir(&file);
 }
 
 pub fn on_menu_event(app: &AppHandle, id: &str) {
@@ -120,12 +121,12 @@ pub fn on_menu_event(app: &AppHandle, id: &str) {
         "autostart" => settings::set_autostart(&sh, !settings::get_autostart(&sh)),
         "pricing" => {
             let f = sh.engine().pricing_user_file().to_path_buf();
-            open_user_file(&sh, f, serde_json::json!({ "models": [{ "match": "gpt-6.1", "in": 2.5, "out": 15, "cr": 0.25 }] }));
+            reveal_user_file(&sh, f, serde_json::json!({ "models": [{ "match": "gpt-6.1", "in": 2.5, "out": 15, "cr": 0.25 }] }));
         }
         "plans" => {
             let f = sh.engine().plans_user_file().to_path_buf();
             // 模板里只放 _示例：把它改名成 agent 名（claude / codex / antigravity / workbuddy）才会生效
-            open_user_file(&sh, f, serde_json::json!({
+            reveal_user_file(&sh, f, serde_json::json!({
                 "_说明": "把 _示例 里的条目改成 agent 名即可覆盖自动识别的套餐；usd 为月费（美元）",
                 "_示例": { "antigravity": { "name": "AI Pro", "usd": 19.99 }, "workbuddy": { "name": "Pro", "usd": 20 } },
             }));

@@ -41,7 +41,7 @@ npm install && npx tauri build # NSIS installer: target/release/bundle/nsis/
 
 ## Usage & settings
 
-- Tray icon: left-click toggles the widget; the right-click menu has always-on-top, launch at login, pricing / plan config, full rescan and quit
+- Tray icon: left-click toggles the widget; the right-click menu has always-on-top, launch at login, show the pricing / plan config file in Explorer, full rescan and quit
 - Drag the title bar to move it (position is remembered); if the card is within 60px of a screen edge when it collapses, it docks to that edge
 - Pin icon (top right): keep it expanded, no auto-collapse
 - Gear icon: per-agent plan (auto / preset / custom monthly price), visibility, appearance, launch at login, auto-collapse, always-on-top, Antigravity quota, Claude quota hook
