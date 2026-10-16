@@ -6,6 +6,7 @@ members = ["core", "src-tauri"]
 version = "0.2.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/devhy-create/token-widget"
 
 # 发布构建：体积优先（这是个常驻托盘的小工具，启动速度和占用比极限性能重要）
 [profile.release]
