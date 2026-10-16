@@ -1,7 +1,7 @@
 {
   "name": "agent-monitor-tauri",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Agent Monitor 的 Tauri 版打包工具（只用来调用 tauri CLI 生成安装包，不是 npm 包）",
   "scripts": {
     "tauri": "tauri",
