@@ -35,7 +35,7 @@
 | `Agent Monitor_x.y.z_x64-setup.exe` | 安装版（约 4MB，当前用户安装，无需管理员；内置 WebView2 引导程序，离线也能装） |
 | `Agent-Monitor-x.y.z-portable-x64.exe` | 单文件便携版（约 6MB），需要系统已装 WebView2（Win11 自带） |
 
-> 与 Electron 版（v0.1）同名且**共用数据目录**（`%APPDATA%	oken-widget`），不能同时运行。从 v0.1 升级请先卸载旧版再安装，历史数据会保留。
+> 与 Electron 版（v0.1）同名且**共用数据目录**（`%APPDATA%\token-widget`），不能同时运行。从 v0.1 升级请先卸载旧版再安装，历史数据会保留。
 
 从源码构建 Tauri 版（需要 Rust 稳定版和 Node.js）：
 

@@ -35,7 +35,7 @@ Download from [Releases](../../releases):
 | `Agent Monitor_x.y.z_x64-setup.exe` | Installer (~4 MB, per-user, no admin needed; bundles the WebView2 bootstrapper so it also works offline) |
 | `Agent-Monitor-x.y.z-portable-x64.exe` | Single-file portable build (~6 MB); needs WebView2 on the system (built into Windows 11) |
 
-> It has the same name as the Electron build (v0.1) and **shares its data directory** (`%APPDATA%	oken-widget`), so the two cannot run at the same time. To upgrade from v0.1, uninstall it first; your history is kept.
+> It has the same name as the Electron build (v0.1) and **shares its data directory** (`%APPDATA%\token-widget`), so the two cannot run at the same time. To upgrade from v0.1, uninstall it first; your history is kept.
 
 Build the Tauri version from source (stable Rust + Node.js):
 
