@@ -21,6 +21,8 @@ pub fn write_jsonl(file: &Path, objs: &[Value]) {
 pub struct Collect {
     pub evs: Vec<Event>,
     pub limits: Vec<(String, i64, Value)>,
+    /// (键, 时间, 开始时的模型；结束为 None)
+    pub busy: Vec<(String, i64, Option<String>)>,
 }
 
 impl Sink for Collect {
@@ -29,6 +31,9 @@ impl Sink for Collect {
     }
     fn set_limits(&mut self, agent: &str, ts: i64, rl: &Value) {
         self.limits.push((agent.to_string(), ts, rl.clone()));
+    }
+    fn busy(&mut self, _agent: &'static str, key: &str, ts: i64, model: Option<&str>) {
+        self.busy.push((key.to_string(), ts, model.map(str::to_string)));
     }
 }
 

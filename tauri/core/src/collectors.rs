@@ -3,12 +3,15 @@
 //!   input = 未命中缓存的输入 token；cr = 缓存读；cw5/cw1 = 5分钟/1小时缓存写
 //!   out = 输出 token（含思考）；rs = 其中的思考 token（仅展示）；dur = 本次生成耗时(ms)，未知为 0
 use crate::lines::{read_lines, Line, ReadResult};
-use crate::util::{js_str, non_empty, num, parse_date_ms};
+use crate::util::{js_number_or_zero, js_str, non_empty, num, parse_date_ms};
+use chrono::{Local, NaiveDate, TimeZone};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 const MIN_DUR: i64 = 300; // 小于 0.3 秒的耗时视为不可信
 const MAX_DUR: i64 = 15 * 60 * 1000;
@@ -37,6 +40,8 @@ pub struct Event {
 pub trait Sink {
     fn emit(&mut self, ev: Event);
     fn set_limits(&mut self, agent: &str, ts: i64, rl: &Value);
+    /// 请求已发出、还没有用量（目前只有 WorkBuddy 主日志能给出）：model 为 Some 表示开始，None 表示结束
+    fn busy(&mut self, _agent: &'static str, _key: &str, _ts: i64, _model: Option<&str>) {}
 }
 
 /// Claude 同一条消息被拆成多行写入时，暂存合并中的消息
@@ -90,7 +95,7 @@ pub fn all_collectors(home: &Path) -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(Claude { home: home.to_path_buf() }),
         Box::new(Codex { home: home.to_path_buf() }),
-        Box::new(WorkBuddy { home: home.to_path_buf() }),
+        Box::new(WorkBuddy::new(home)),
         Box::new(Antigravity { home: home.to_path_buf() }),
         Box::new(ZCode { home: home.to_path_buf() }),
         Box::new(OpenCode { home: home.to_path_buf() }),
@@ -295,18 +300,134 @@ impl Collector for Codex {
 }
 
 // ---------------------------------------------------------------- WorkBuddy
+/// 主日志里记下的 chat 请求精确耗时只留 15 分钟：只有实时速度用得上，历史日志里的不必留
+const WB_DUR_KEEP: i64 = 15 * 60 * 1000;
+
 pub struct WorkBuddy {
     home: PathBuf,
+    /// 主日志 qua.end 给出的 chat 请求耗时：message_id → (耗时 ms, 结束时间)，jsonl 用量行入账时取用
+    durs: Mutex<HashMap<String, (i64, i64)>>,
+}
+
+impl WorkBuddy {
+    pub fn new(home: &Path) -> Self {
+        WorkBuddy { home: home.to_path_buf(), durs: Mutex::new(HashMap::new()) }
+    }
+
+    /// 主日志（logs/<日期>/<启动时间>__<哈希>.log）：每次模型请求有 qua.enqueue / qua.start / qua.end 三行。
+    /// jsonl 要等请求结束才写用量，主日志在请求发出时就有记录，所以“生成中”和模型名靠它；
+    /// qua.end 带 token 数与总耗时。实测：正常结束的 chat 请求在 jsonl 里都有同 messageId 的记录（带缓存命中拆分，计费更准），
+    /// 只取耗时；标题生成（conversation_topic）、上下文压缩（compress）、webfetch 等附带请求 jsonl 里没有，从这里入账。
+    fn scan_log(&self, file: &Path, st: &mut FileState, sink: &mut dyn Sink, now: i64) -> io::Result<ReadResult> {
+        let r = read_lines(file, st.off, &["] qua.enqueue: ", "] qua.start: ", "] qua.end: "], &[], &mut |line| {
+            let Line::Hit(text, _) = line else { return };
+            let Some(i) = text.find("] qua.") else { return };
+            let Some((kind, body)) = text[i + 6..].split_once(": ") else { return };
+            let Ok(o) = serde_json::from_str::<Value>(body.trim()) else { return };
+            let Some(id) = non_empty(o.get("message_id")) else { return };
+            let ts = wb_log_ts(text).unwrap_or(now);
+            let model = non_empty(o.get("model")).unwrap_or("unknown");
+            if kind != "end" {
+                sink.busy("workbuddy", id, ts, Some(model));
+                return;
+            }
+            sink.busy("workbuddy", id, ts, None);
+            let cost = snum(o.get("total_cost_ms")) as i64;
+            let done = o.get("finish_flag").and_then(Value::as_str) == Some("done");
+            if done && o.get("request_type").and_then(Value::as_str) == Some("chat") {
+                if now - ts < WB_DUR_KEEP {
+                    if let Ok(mut d) = self.durs.lock() {
+                        d.retain(|_, v| now - v.1 < WB_DUR_KEEP);
+                        d.insert(id.to_string(), (cost, ts));
+                    }
+                }
+                return;
+            }
+            // 被中断的请求 token 为 0，不入账；事件键与 jsonl 的 messageId 相同，万一两边都有也会被去重
+            let (pt, ct) = (snum(o.get("prompt_tokens")), snum(o.get("completion_tokens")));
+            if pt + ct == 0 { return; }
+            sink.emit(Event {
+                agent: "workbuddy", ts, model: model.to_string(),
+                sid: non_empty(o.get("conversation_id")).map(str::to_string).unwrap_or_else(|| stem(file)),
+                key: id.to_string(),
+                // 日志里没有缓存命中拆分，输入全按未命中算；think_total_tokens 是客户端估算值，不当思考 token 用
+                input: pt, cr: 0, cw5: 0, cw1: 0, out: ct, rs: 0,
+                dur: clamp_dur(cost),
+            });
+        })?;
+        st.off = r.offset;
+        Ok(r)
+    }
+}
+
+/// qua 行里的数字都写成字符串（"completion_tokens":"1517"）
+fn snum(v: Option<&Value>) -> u64 {
+    let f = js_number_or_zero(v);
+    if f.is_finite() && f > 0.0 { f as u64 } else { 0 }
+}
+
+/// 形如 YYYY-MM-DD 的日期目录名；file 为 true 时匹配 YYYY-MM-DD-HH-MM-SS__*.log 的主日志文件名
+fn wb_log_name(n: &str, file: bool) -> bool {
+    let b = n.as_bytes();
+    let len = if file { 19 } else { 10 };
+    if b.len() < len || (!file && b.len() != len) {
+        return false;
+    }
+    let shape = (0..len).all(|i| if i % 3 == 1 && i >= 4 { b[i] == b'-' } else { b[i].is_ascii_digit() });
+    shape && (!file || (n[len..].starts_with("__") && n.ends_with(".log")))
+}
+
+/// WorkBuddy 主日志行首的本地时间，如 “[2026年10月16日 下午1:43:39.584]”。
+/// 写法随系统区域设置变化：兼容“年月日 + 上午/下午”、ISO 写法和“月/日/年, 时:分:秒 AM/PM”；解析不了返回 None
+fn wb_log_ts(line: &str) -> Option<i64> {
+    let s = line.strip_prefix('[')?;
+    let head = &s[..s.find(']')?];
+    let runs: Vec<&str> = head.split(|c: char| !c.is_ascii_digit()).filter(|r| !r.is_empty()).collect();
+    if runs.len() < 6 {
+        return None;
+    }
+    let n: Vec<u32> = runs.iter().map(|r| r.parse().unwrap_or(0)).collect();
+    let (y, m, d) = if runs[0].len() == 4 {
+        (n[0], n[1], n[2])
+    } else if runs[2].len() == 4 {
+        // 年份在最后：第一个数大于 12 只能是“日/月/年”，否则按美式“月/日/年”
+        if n[0] > 12 { (n[2], n[1], n[0]) } else { (n[2], n[0], n[1]) }
+    } else {
+        return None;
+    };
+    let mut h = n[3];
+    let pm = head.contains("下午") || head.contains("PM") || head.contains("pm");
+    let am = head.contains("上午") || head.contains("AM") || head.contains("am");
+    if pm && h < 12 { h += 12; }
+    if am && h == 12 { h = 0; }
+    // 毫秒按小数位补齐：“.5” 是 500ms
+    let ms = runs.get(6).map_or(0, |r| format!("{:0<3}", &r[..r.len().min(3)]).parse().unwrap_or(0));
+    let dt = NaiveDate::from_ymd_opt(y as i32, m, d)?.and_hms_milli_opt(h, n[4], n[5], ms)?;
+    Some(Local.from_local_datetime(&dt).earliest()?.timestamp_millis())
 }
 
 impl Collector for WorkBuddy {
     fn name(&self) -> &'static str { "workbuddy" }
 
     fn discover(&self) -> Vec<PathBuf> {
-        walk_jsonl(&self.home.join(".workbuddy-ai").join("projects"))
+        let root = self.home.join(".workbuddy-ai");
+        // 主日志排在 jsonl 前面：同一轮扫描里先读到 qua.end 的耗时，jsonl 用量行入账时才取得到
+        let mut v = Vec::new();
+        if let Ok(rd) = std::fs::read_dir(root.join("logs")) {
+            for e in rd.flatten() {
+                if !wb_log_name(&e.file_name().to_string_lossy(), false) { continue; }
+                let Ok(files) = std::fs::read_dir(e.path()) else { continue };
+                v.extend(files.flatten().filter(|f| wb_log_name(&f.file_name().to_string_lossy(), true)).map(|f| f.path()));
+            }
+        }
+        v.extend(walk_jsonl(&root.join("projects")));
+        v
     }
 
     fn scan(&self, file: &Path, st: &mut FileState, sink: &mut dyn Sink, now: i64) -> io::Result<ReadResult> {
+        if file.extension().map_or(false, |e| e == "log") {
+            return self.scan_log(file, st, sink, now);
+        }
         let marks = ["\"type\":\"function_call_result\"", "\"role\":\"user\""];
         let off = st.off;
         let r = read_lines(file, off, &["\"rawUsage\""], &marks, &mut |line| match line {
@@ -334,6 +455,10 @@ impl Collector for WorkBuddy {
                     num(ru.get("completion_thinking_tokens")),
                     num(ru.get("completion_tokens_details").and_then(|d| d.get("reasoning_tokens"))),
                 ]);
+                // 主日志 qua.end 里有这次请求的精确总耗时就用它；没有（日志被清理 / 还没写到）才用“距上次请求起点”估算
+                let exact = non_empty(pd.get("messageId"))
+                    .and_then(|m| self.durs.lock().ok().and_then(|mut d| d.remove(m)))
+                    .map(|(d, _)| d);
                 sink.emit(Event {
                     agent: "workbuddy", ts: t,
                     model: non_empty(pd.get("model")).or_else(|| non_empty(pd.get("requestModelId"))).unwrap_or("unknown").to_string(),
@@ -344,7 +469,7 @@ impl Collector for WorkBuddy {
                     },
                     input: prompt.saturating_sub(hit).saturating_sub(w), cr: hit, cw5: w, cw1: 0,
                     out: num(ru.get("completion_tokens")), rs,
-                    dur: clamp_dur(t - st.mark),
+                    dur: clamp_dur(exact.unwrap_or(t - st.mark)),
                 });
                 st.mark = t;
             }

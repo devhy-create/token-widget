@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 const LIVE_WINDOW: i64 = 60 * 1000; // 实时速度统计窗口
 const LIVE_HOLD: i64 = 20 * 1000; // 事件后多久内仍算“正在生成”
 const RING_KEEP: i64 = 10 * 60 * 1000; // 实时事件环保留时长
+const BUSY_MAX: i64 = 15 * 60 * 1000; // “请求进行中”最多算这么久：日志没写结束行（崩溃 / 被杀）时不会一直显示生成中
 const HOUR_KEEP_DAYS: i64 = 14;
 const DISCOVER_EVERY: i64 = 20 * 1000;
 const HOUR_MS: i64 = 3_600_000;
@@ -110,6 +111,8 @@ struct Ledger {
     ring: Vec<RingEv>,
     last_ev: BTreeMap<String, LastEv>,
     log_plans: BTreeMap<String, String>,
+    /// 进行中的请求：“agent:键” → (agent, 开始时间, 模型)。只在内存里，不落盘
+    busy: HashMap<String, (String, i64, String)>,
     dirty: bool,
     ver: u64,
 }
@@ -168,6 +171,15 @@ impl Sink for Ledger {
 
     fn set_limits(&mut self, agent: &str, ts: i64, rl: &Value) {
         self.put_limits(agent, ts, rl);
+    }
+
+    fn busy(&mut self, agent: &'static str, key: &str, ts: i64, model: Option<&str>) {
+        let k = format!("{agent}:{key}");
+        match model {
+            // 同一请求有排队、开始两行：保留最早的开始时间
+            Some(m) => { self.busy.entry(k).or_insert_with(|| (agent.to_string(), ts, m.to_string())); }
+            None => { self.busy.remove(&k); }
+        }
     }
 }
 
@@ -475,6 +487,7 @@ impl Engine {
     fn prune(&mut self, now: i64) {
         let cut = now - RING_KEEP;
         self.ledger.ring.retain(|e| e.ts >= cut);
+        self.ledger.busy.retain(|_, b| now - b.1 < BUSY_MAX);
         let hc = hour_key(now - HOUR_KEEP_DAYS * 86_400_000);
         let before = self.ledger.hours.len();
         self.ledger.hours.retain(|k, _| *k >= hc);
@@ -708,17 +721,36 @@ impl Engine {
                 "active": now - l.ts < LIVE_HOLD, "tokens": list.iter().map(|e| e.tot).sum::<u64>(),
             }))
         }).collect();
+        // 已发出、还没结束的请求：还没有用量和速度，但要算“生成中”，并带上模型名与开始时间（busy）
+        let mut busy: Vec<&(String, i64, String)> = self.ledger.busy.values().filter(|b| b.0 == agent && now - b.1 < BUSY_MAX).collect();
+        busy.sort_by(|a, b| b.1.cmp(&a.1)); // 最新的在前：同一模型有多个进行中请求时取最近开始的那个
+        for b in &busy {
+            match models.iter_mut().find(|(_, v)| v["model"] == b.2.as_str()) {
+                Some((k, v)) => {
+                    if v.get("busy").is_none() {
+                        v["active"] = json!(true);
+                        v["busy"] = json!(b.1);
+                        *k = (*k).max(b.1);
+                    }
+                }
+                None => models.push((b.1, json!({
+                    "model": b.2, "tps": null, "lastTps": null, "lastTs": b.1, "active": true, "busy": b.1, "tokens": 0,
+                }))),
+            }
+        }
         models.sort_by(|a, b| b.0.cmp(&a.0));
         let win_refs: Vec<&RingEv> = win.iter().map(|e| **e).collect();
+        let cur = busy.first();
         json!({
-            "active": last.map_or(false, |l| now - l.ts < LIVE_HOLD),
+            "active": cur.is_some() || last.map_or(false, |l| now - l.ts < LIVE_HOLD),
+            "busy": cur.map(|b| b.1), // 当前进行中请求的开始时间；没有为 null
             "tps": rate(&win_refs), // 近 60 秒平均输出速度 tok/s
             "lastTps": last.and_then(|l| tps_of(l)),
             "perMin": win_refs.iter().map(|e| e.tot).sum::<u64>(), // 近 60 秒总吞吐 token（含缓存）
             "outMin": win_refs.iter().map(|e| e.out).sum::<u64>(), // 近 60 秒输出 token
             "reqMin": win_refs.len(), // 近 60 秒请求数
             "lastTs": last.map_or(0, |l| l.ts),
-            "model": last.map(|l| l.model.clone()),
+            "model": cur.map(|b| b.2.clone()).or_else(|| last.map(|l| l.model.clone())),
             "models": models.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
         })
     }

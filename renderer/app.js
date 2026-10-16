@@ -33,6 +33,13 @@ function ago(ms) {
   if (s < 86400) return `${Math.floor(s / 3600)} 小时前`;
   return `${Math.floor(s / 86400)} 天前`;
 }
+// 请求已进行多久（“生成中”时显示）
+function elapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${s % 60} 秒`;
+}
+// 请求已发出但还没有任何速度数据（WorkBuddy 要等请求结束才写用量）：只能显示“生成中”
+const noSpeed = (m) => m.busy != null && (m.tps ?? m.lastTps) == null;
 const shortModel = (m) => String(m).replace(/^claude-/, '').replace(/-\d{8}$/, '');
 const mult = (v, price) => (price > 0 ? (v / price >= 10 ? (v / price).toFixed(0) : (v / price).toFixed(1)) + '×' : '');
 const dayLabel = (day) => { const [y, m, d] = day.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }); };
@@ -199,7 +206,7 @@ function renderPill(s) {
     const on = d.live.active;
     setCls(el, 'on', on);
     let txt = '—';
-    if (on) txt = tps(d.live.tps ?? d.live.lastTps);
+    if (on) txt = noSpeed(d.live) ? '…' : tps(d.live.tps ?? d.live.lastTps);
     else if (d.limits && d.limits.primary) { const w = win(d.limits.primary, s.now); txt = Math.round(w.used) + '%'; }
     setText($('em', el), txt);
     tot += d.today.usd;
@@ -234,9 +241,10 @@ function render(s) {
 
     // 右侧：速度按模型分开显示。只有 1 个模型在生成 → 大号数字；≥2 个 → 每个模型一行；都没在生成 → 空闲
     const act = lv.models.filter((m) => m.active);
-    const mtps = (m) => tps(m.tps ?? m.lastTps);
+    const mtps = (m) => (noSpeed(m) ? '…' : tps(m.tps ?? m.lastTps));
     let rh;
     if (act.length >= 2) rh = act.slice(0, 3).map((m) => `<div class="mv"><span title="${esc(m.model)}">${esc(shortModel(m.model))}</span><b>${mtps(m)}</b></div>`).join('') + '<div class="b">tok/s</div>';
+    else if (act.length === 1 && noSpeed(act[0])) rh = `<div class="a">生成中</div><div class="b">已 ${elapsed(now - act[0].busy)}</div>`;
     else if (act.length === 1) rh = `<div class="a">${mtps(act[0])}</div><div class="b">tok/s</div>`;
     else rh = `<div class="a">${d.last ? '空闲' : '—'}</div><div class="b">${d.last ? ago(now - d.last.ts) : '无数据'}</div>`;
     setHtml(r.right, rh);
@@ -264,7 +272,7 @@ function render(s) {
       // 分模型速度：近 5 分钟内出现过的模型，生成中的用实时速度，其余显示最近一次速度
       const sp = lv.models.slice(0, 5);
       r.speeds.style.display = sp.length ? '' : 'none';
-      setHtml(r.speeds, sp.map((m) => `<div class="sr${m.active ? ' on' : ''}"><i></i><span class="n">${esc(shortModel(m.model))}</span><span class="v">${m.active ? mtps(m) + ' tok/s' : (m.lastTps != null ? Math.round(m.lastTps) + ' tok/s · ' : '') + ago(now - m.lastTs)}</span></div>`).join(''));
+      setHtml(r.speeds, sp.map((m) => `<div class="sr${m.active ? ' on' : ''}"><i></i><span class="n">${esc(shortModel(m.model))}</span><span class="v">${m.active ? (noSpeed(m) ? `生成中 · 已 ${elapsed(now - m.busy)}` : mtps(m) + ' tok/s') : (m.lastTps != null ? Math.round(m.lastTps) + ' tok/s · ' : '') + ago(now - m.lastTs)}</span></div>`).join(''));
 
       // 分模型额度（目前只有 Antigravity 有）：已用百分比 + 重置倒计时
       const qm = (d.limits && d.limits.models) || [];
