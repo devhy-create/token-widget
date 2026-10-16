@@ -1,6 +1,7 @@
 name: Release
 
-# 推送 v* 标签时在 Windows 上打包安装版 + 便携版，并上传到 GitHub Release
+# 推送 v* 标签时在 Windows 上打包 Tauri 版（NSIS 安装包 + 单文件便携版），上传到 GitHub Release。
+# Electron 版（v0.1）不再发布安装包，只保留源码运行方式（见 README）。
 on:
   push:
     tags: ['v*']
@@ -9,24 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npx electron-builder --win nsis portable --publish never
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.exe
-          generate_release_notes: true
-
-  # Tauri 版（v0.2）：NSIS 安装包 + 单文件便携版（便携版依赖系统已装 WebView2，Win11 自带）
+  # 便携版依赖系统已装 WebView2（Win11 自带）
   tauri-windows:
     runs-on: windows-latest
     steps:
@@ -57,3 +41,5 @@ jobs:
         with:
           files: tauri/out/*.exe
           generate_release_notes: true
+          # 标签名带 -（如 v0.3.0-beta.1）或首个版本先标预发布，确认没问题后再在网页上转正式
+          prerelease: true

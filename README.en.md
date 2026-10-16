@@ -2,7 +2,7 @@
 
 English · [中文](README.md)
 
-A Windows desktop floating widget that shows, side by side and in real time, the token speed (per model), 5-hour / weekly quota, and today's cost and token usage of **Claude / Codex / Antigravity / WorkBuddy**. Apple-style look, low resource use. It collapses into a pill when the mouse leaves (docking to the top / bottom / left / right edge) and expands when the mouse comes back.
+A Windows desktop floating widget that shows, side by side and in real time, the token speed (per model), 5-hour / weekly quota, and today's cost and token usage of **Claude / Codex / Antigravity / WorkBuddy / ZCode / OpenCode**. Apple-style look, low resource use. It collapses into a pill when the mouse leaves (docking to the top / bottom / left / right edge) and expands when the mouse comes back.
 
 ![Screenshot](docs/screenshot.png)
 
@@ -10,7 +10,7 @@ A Windows desktop floating widget that shows, side by side and in real time, the
 
 ## Features
 
-- Four agents on one screen: today's cost, tokens, current model; 5h / weekly rings when quota data is available
+- Multiple agents on one screen: today's cost, tokens, current model; 5h / weekly rings when quota data is available
 - Live speed: one big tok/s number when a single model is generating, a per-model list when several are
 - Click an agent for a 14-day bar chart, cycle / month-end projections, subscription payback ratio and a per-model breakdown
 - Auto-collapse into a pill (shows the 5h percentage when idle, the speed while generating); vertical or horizontal depending on the docked edge
@@ -19,25 +19,20 @@ A Windows desktop floating widget that shows, side by side and in real time, the
 
 ## Install
 
-Download from [Releases](../../releases):
+Download from [Releases](../../releases) (the Tauri build, from v0.2 on: small, system acrylic blur, more agents):
 
 | File | Description |
 | --- | --- |
-| `Agent Monitor Setup x.y.z.exe` | Installer (per-user, no admin needed); launch at login supported |
-| `Agent Monitor-x.y.z-portable.exe` | Portable build, just double-click; launch at login also works |
+| `Agent Monitor_x.y.z_x64-setup.exe` | Installer (~4 MB, per-user, no admin needed); launch at login supported; bundles the WebView2 bootstrapper, which installs WebView2 online if the system lacks it |
+| `Agent-Monitor-x.y.z-portable-x64.exe` | Single-file portable build (~6 MB), just double-click; needs WebView2 on the system (built into Windows 11) |
 
 > On first run Windows SmartScreen may warn about an "unknown publisher" (the project has no code-signing certificate). Click "More info → Run anyway".
 
-### Tauri build (v0.2: small, system acrylic blur, more agents)
+> If you ran the Electron build (v0.1) from source: both share the same name and **data directory** (`%APPDATA%\token-widget`) and cannot run at the same time. Quit / uninstall it before installing the Tauri build; your history is kept.
 
-| File | Description |
-| --- | --- |
-| `Agent Monitor_x.y.z_x64-setup.exe` | Installer (~4 MB, per-user, no admin needed; bundles the WebView2 bootstrapper so it also works offline) |
-| `Agent-Monitor-x.y.z-portable-x64.exe` | Single-file portable build (~6 MB); needs WebView2 on the system (built into Windows 11) |
+### Build from source (Tauri)
 
-> It has the same name as the Electron build (v0.1) and **shares its data directory** (`%APPDATA%\token-widget`), so the two cannot run at the same time. To upgrade from v0.1, uninstall it first; your history is kept.
-
-Build the Tauri version from source (stable Rust + Node.js):
+Requires stable Rust + Node.js:
 
 ```bash
 cd tauri
@@ -45,9 +40,9 @@ cargo test -p agent_core       # data-engine tests
 npm install && npx tauri build # NSIS installer: target/release/bundle/nsis/
 ```
 
-### Run from source (Electron build)
+### Run from source (Electron build, v0.1)
 
-Requires Node.js 22+.
+The earlier Electron implementation: no longer released as installers, supports only the first four agents. Requires Node.js 22+.
 
 ```bash
 npm install

@@ -2,7 +2,7 @@
 
 [English](README.en.md) · 中文
 
-一个 Windows 桌面悬浮小组件：在同一块屏幕上实时显示 **Claude / Codex / Antigravity / WorkBuddy** 的 token 速度（分模型）、5 小时 / 每周额度、今日花费与 token 用量。苹果风格、占用低，鼠标移开自动收缩成胶囊（可贴顶 / 底 / 左 / 右），移入即展开。
+一个 Windows 桌面悬浮小组件：在同一块屏幕上实时显示 **Claude / Codex / Antigravity / WorkBuddy / ZCode / OpenCode** 的 token 速度（分模型）、5 小时 / 每周额度、今日花费与 token 用量。苹果风格、占用低，鼠标移开自动收缩成胶囊（可贴顶 / 底 / 左 / 右），移入即展开。
 
 ![截图](docs/screenshot.png)
 
@@ -10,7 +10,7 @@
 
 ## 功能
 
-- 四个 agent 同屏：今日花费、token、当前模型；有额度数据的显示 5h / 周圆环
+- 多个 agent 同屏：今日花费、token、当前模型；有额度数据的显示 5h / 周圆环
 - 实时速度：1 个模型在生成时显示大号 tok/s，多个模型同时生成时逐个列出
 - 点开某个 agent：近 14 天柱状图、本周期 / 月底推算、订阅回本倍数、分模型明细
 - 自动收缩成胶囊（空闲时显示 5h 百分比，生成时显示速度），贴边后竖向 / 横向自适应
@@ -19,25 +19,20 @@
 
 ## 安装
 
-到 [Releases](../../releases) 下载：
+到 [Releases](../../releases) 下载（Tauri 版，v0.2 起；体积小、支持系统毛玻璃与更多 agent）：
 
 | 文件 | 说明 |
 | --- | --- |
-| `Agent Monitor Setup x.y.z.exe` | 安装版（当前用户安装，无需管理员），支持开机自启 |
-| `Agent Monitor-x.y.z-portable.exe` | 便携版，双击即用，开机自启同样可用 |
+| `Agent Monitor_x.y.z_x64-setup.exe` | 安装版（约 4MB，当前用户安装，无需管理员），支持开机自启；内置 WebView2 引导程序，系统缺 WebView2 时会联网自动安装 |
+| `Agent-Monitor-x.y.z-portable-x64.exe` | 单文件便携版（约 6MB），双击即用，需要系统已装 WebView2（Win11 自带） |
 
 > 首次运行 Windows SmartScreen 可能提示“未知发布者”（项目没有代码签名证书），点“更多信息 → 仍要运行”即可。
 
-### Tauri 版（v0.2，体积小、支持系统毛玻璃与更多 agent）
+> 自己用源码跑过 Electron 版（v0.1）的：两版同名且**共用数据目录**（`%APPDATA%\token-widget`），不能同时运行；装 Tauri 版前先退出 / 卸载 Electron 版，历史数据会保留。
 
-| 文件 | 说明 |
-| --- | --- |
-| `Agent Monitor_x.y.z_x64-setup.exe` | 安装版（约 4MB，当前用户安装，无需管理员；内置 WebView2 引导程序，离线也能装） |
-| `Agent-Monitor-x.y.z-portable-x64.exe` | 单文件便携版（约 6MB），需要系统已装 WebView2（Win11 自带） |
+### 从源码构建（Tauri 版）
 
-> 与 Electron 版（v0.1）同名且**共用数据目录**（`%APPDATA%\token-widget`），不能同时运行。从 v0.1 升级请先卸载旧版再安装，历史数据会保留。
-
-从源码构建 Tauri 版（需要 Rust 稳定版和 Node.js）：
+需要 Rust 稳定版和 Node.js：
 
 ```bash
 cd tauri
@@ -45,9 +40,9 @@ cargo test -p agent_core       # 数据引擎测试
 npm install && npx tauri build # 生成 NSIS 安装包：target/release/bundle/nsis/
 ```
 
-### 从源码运行（Electron 版）
+### 从源码运行（Electron 版，v0.1）
 
-需要 Node.js 22+。
+早期的 Electron 实现，不再发布安装包，只支持前四个 agent。需要 Node.js 22+。
 
 ```bash
 npm install
