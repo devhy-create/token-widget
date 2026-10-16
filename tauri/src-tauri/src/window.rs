@@ -2,6 +2,7 @@
 //! 全部用逻辑像素计算（与 Electron 版的 DIP 一致），常量也沿用 Electron 版。
 use crate::state::{Dock, Mode, Rect, Sh};
 use serde_json::json;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow};
 
@@ -13,7 +14,7 @@ pub const CARD_W: f64 = 380.0;
 const PILL_W: f64 = 372.0;
 const PILL_H: f64 = 30.0;
 /// 贴左 / 右边时的竖向胶囊宽度（高度由渲染端按显示的 agent 数量上报）
-const VPILL_W: f64 = 26.0;
+pub const VPILL_W: f64 = 26.0;
 /// 卡片离屏幕边缘多近就吸附
 const DOCK_SNAP: f64 = 60.0;
 /// 吸附后与屏幕边缘留的缝
@@ -26,8 +27,81 @@ pub fn win(sh: &Sh) -> Option<WebviewWindow> {
     sh.app.get_webview_window("main")
 }
 
+// ---------------------------------------------------------------- 文本缩放
+// Windows「设置 → 辅助功能 → 文本大小」（100%~225%）会被 WebView2 乘进整个页面的缩放：
+// 文本大小 110% 时 CSS 1px = 1.1 逻辑像素，页面里的一切（图标、间距）都放大 1.1 倍。
+// 卡片宽度、阴影边距、渲染端上报的高度都是 CSS 像素，换算成窗口逻辑像素都要乘这个比例，
+// 否则窗口装不下页面，右侧和底部会被切掉（另一台电脑 TextScaleFactor=110 时实测如此）。
+static TEXT_SCALE: AtomicU64 = AtomicU64::new(0x3FF0_0000_0000_0000); // 1.0 的位表示
+
+/// 当前文本缩放比例（1.0 = 100%）
+pub fn text_scale() -> f64 {
+    f64::from_bits(TEXT_SCALE.load(Ordering::Relaxed))
+}
+
+/// 测试开关：环境变量 TW_TEXT_SCALE=1.1 模拟文本大小 110%（窗口按比例放大，页面也用 set_zoom 放大，模拟 WebView2 的行为）
+pub fn simulated_text_scale() -> Option<f64> {
+    std::env::var("TW_TEXT_SCALE").ok()?.trim().parse::<f64>().ok().filter(|v| (1.0..=3.0).contains(v))
+}
+
+#[cfg(windows)]
+fn system_text_scale() -> Option<f64> {
+    use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+    let key: Vec<u16> = "Software\\Microsoft\\Accessibility\0".encode_utf16().collect();
+    let name: Vec<u16> = "TextScaleFactor\0".encode_utf16().collect();
+    let (mut v, mut len) = (0u32, 4u32);
+    // 没调过文本大小时这个值不存在，等于 100%
+    let r = unsafe {
+        RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr(), RRF_RT_REG_DWORD, std::ptr::null_mut(), &mut v as *mut u32 as *mut _, &mut len)
+    };
+    (r == 0 && (100..=225).contains(&v)).then(|| v as f64 / 100.0)
+}
+
+#[cfg(not(windows))]
+fn system_text_scale() -> Option<f64> {
+    None
+}
+
+/// 重新读取文本缩放比例，变了返回 true
+pub fn refresh_text_scale() -> bool {
+    let t = simulated_text_scale().or_else(system_text_scale).unwrap_or(1.0);
+    TEXT_SCALE.swap(t.to_bits(), Ordering::Relaxed) != t.to_bits()
+}
+
+/// 用户在系统设置里改了文本大小：按新比例重排窗口（推送线程每秒检查一次，读注册表很快）
+pub fn check_text_scale(sh: &Sh) {
+    if !refresh_text_scale() {
+        return;
+    }
+    let Some(w) = win(sh) else { return };
+    let (mode, exp_h, anchor_right) = {
+        let mut ws = sh.ws();
+        ws.anim_gen += 1; // 打断正在进行的动画，按新比例重算
+        ws.anim_to = None;
+        (ws.mode, ws.exp_h, ws.anchor_right)
+    };
+    if mode == Mode::Collapsed {
+        // 收缩态：按新比例重新收一次（重新挑贴靠的边、算胶囊位置）
+        sh.ws().mode = Mode::Expanded;
+        collapse(sh);
+        return;
+    }
+    let b = bounds(&w);
+    let wa = work_area_of(&w, &b);
+    let s = win_size(CARD_W, exp_h.min(max_card_h(&wa)));
+    let x = if anchor_right { b.x + b.w - s.0 } else { b.x };
+    set_bounds(&w, &Rect { x, y: b.y, w: s.0, h: s.1 });
+}
+
+/// 卡片内容（CSS 像素）在 cw × ch 时的窗口逻辑尺寸。向上取整，避免小数像素让页面差一点装不下
 pub fn win_size(cw: f64, ch: f64) -> (f64, f64) {
-    (cw + 2.0 * margin(), ch + 2.0 * margin())
+    let t = text_scale();
+    (((cw + 2.0 * css_margin()) * t).ceil(), ((ch + 2.0 * css_margin()) * t).ceil())
+}
+
+/// 展开态卡片最高多少 CSS 像素：窗口不超过工作区高度减 8
+pub fn max_card_h(wa: &Rect) -> f64 {
+    (wa.h - 8.0) / text_scale() - 2.0 * css_margin()
 }
 
 pub fn bounds(w: &WebviewWindow) -> Rect {
@@ -42,9 +116,14 @@ pub fn set_bounds(w: &WebviewWindow, r: &Rect) {
     let _ = w.set_position(LogicalPosition::new(r.x, r.y));
 }
 
-/// 透明边距（给阴影留的）。毛玻璃开启时模糊铺满整个窗口、形状靠区域裁切，没有阴影可画，边距为 0
-pub fn margin() -> f64 {
+/// 透明边距（给阴影留的，CSS 像素）。毛玻璃开启时模糊铺满整个窗口、形状靠区域裁切，没有阴影可画，边距为 0
+fn css_margin() -> f64 {
     if crate::fx::enabled() { 0.0 } else { M }
+}
+
+/// 透明边距换算成窗口逻辑像素（随文本缩放放大）；窗口定位、贴边、判断光标是否在卡片内都用它
+pub fn margin() -> f64 {
+    css_margin() * text_scale()
 }
 
 /// 运行时开 / 关毛玻璃：窗口边距随之在 0 与 M 之间变化，要保持卡片位置不动、重算窗口矩形
@@ -303,7 +382,7 @@ pub fn expand(sh: &Sh) {
     }
     let b = bounds(&w);
     let wa = work_area_of(&w, &b);
-    let s = win_size(CARD_W, exp_h.min(wa.h - 2.0 * margin() - 8.0));
+    let s = win_size(CARD_W, exp_h.min(max_card_h(&wa)));
     let mut x = if anchor_right { b.x + b.w - s.0 } else { b.x };
     x = x.min(wa.x + wa.w - s.0 + margin()).max(wa.x - margin());
     let y = b.y.min(wa.y + wa.h - s.1 + margin() - 4.0).max(wa.y - margin() + 4.0);

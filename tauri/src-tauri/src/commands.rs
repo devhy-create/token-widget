@@ -10,6 +10,10 @@ use tauri::State;
 pub fn ready(sh: State<'_, Sh>) {
     let sh: Sh = sh.inner().clone();
     if let Some(w) = window::win(&sh) {
+        // 测试开关 TW_TEXT_SCALE：用页面缩放模拟 WebView2 在系统文本大小 > 100% 时的放大
+        if let Some(t) = window::simulated_text_scale() {
+            let _ = w.set_zoom(t);
+        }
         let _ = w.show();
         crate::fx::restyle(&w);
     }
@@ -25,7 +29,8 @@ pub fn resize(sh: State<'_, Sh>, h: f64) {
     let sh: Sh = sh.inner().clone();
     let Some(w) = window::win(&sh) else { return };
     let wa = window::work_area_of(&w, &window::bounds(&w));
-    let exp_h = h.round().min(wa.h - 2.0 * window::margin() - 8.0).max(120.0);
+    // h 是 CSS 像素；上限按文本缩放折算，保证窗口不超出工作区
+    let exp_h = h.round().min(window::max_card_h(&wa)).max(120.0);
     let (mode, anim_to) = {
         let mut ws = sh.ws();
         ws.exp_h = exp_h;
@@ -56,7 +61,7 @@ pub fn pillsize(sh: State<'_, Sh>, h: f64) {
     }
     let wa = window::work_area_of(&w, &window::bounds(&w));
     let vh = sh.ws().v_pill_h;
-    let s = window::win_size(64.0, vh);
+    let s = window::win_size(window::VPILL_W, vh);
     let y = pos.1.min(wa.y + wa.h - s.1 + window::margin() - 6.0).max(wa.y - window::margin() + 6.0);
     sh.ws().pill_pos = (pos.0, y);
     window::tween(&sh, Rect { x: pos.0, y, w: s.0, h: s.1 });

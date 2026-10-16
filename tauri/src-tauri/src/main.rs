@@ -62,6 +62,7 @@ fn spawn_push_thread(sh: &Sh) {
     let sh = sh.clone();
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(1));
+        window::check_text_scale(&sh);
         window::push(&sh);
     });
 }
@@ -75,6 +76,8 @@ fn create_window(sh: &Sh) -> tauri::Result<()> {
         Ok("0") => false,
         _ => cfg.blur,
     });
+    // 系统文本缩放同样要在算窗口尺寸之前读好
+    window::refresh_text_scale();
     let exp_h = sh.ws().exp_h;
     let (w, h) = window::win_size(window::CARD_W, exp_h);
     let theme = match cfg.theme.as_str() {
