@@ -19,37 +19,24 @@
 
 ## 安装
 
-到 [Releases](../../releases) 下载（Tauri 版，v0.2 起；体积小、支持系统毛玻璃与更多 agent）：
+到 [Releases](../../releases) 下载：
 
 | 文件 | 说明 |
 | --- | --- |
-| `Agent Monitor_x.y.z_x64-setup.exe` | 安装版（约 4MB，当前用户安装，无需管理员），支持开机自启；内置 WebView2 引导程序，系统缺 WebView2 时会联网自动安装 |
+| `Agent.Monitor_x.y.z_x64-setup.exe` | 安装版（约 4MB，当前用户安装，无需管理员），支持开机自启；内置 WebView2 引导程序，系统缺 WebView2 时会联网自动安装 |
 | `Agent-Monitor-x.y.z-portable-x64.exe` | 单文件便携版（约 6MB），双击即用，需要系统已装 WebView2（Win11 自带） |
 
 > 首次运行 Windows SmartScreen 可能提示“未知发布者”（项目没有代码签名证书），点“更多信息 → 仍要运行”即可。
 
-> 自己用源码跑过 Electron 版（v0.1）的：两版同名且**共用数据目录**（`%APPDATA%\token-widget`），不能同时运行；装 Tauri 版前先退出 / 卸载 Electron 版，历史数据会保留。
+### 从源码构建
 
-### 从源码构建（Tauri 版）
-
-需要 Rust 稳定版和 Node.js：
+需要 Rust 稳定版和 Node.js（Node 只用来调用 Tauri CLI 打包）：
 
 ```bash
 cd tauri
 cargo test -p agent_core       # 数据引擎测试
+cargo run -p agent-monitor     # 开发运行
 npm install && npx tauri build # 生成 NSIS 安装包：target/release/bundle/nsis/
-```
-
-### 从源码运行（Electron 版，v0.1）
-
-早期的 Electron 实现，不再发布安装包，只支持前四个 agent。需要 Node.js 22+。
-
-```bash
-npm install
-npm start          # 开发运行（开发模式下“开机自启”不可用）
-npm test           # 跑测试
-npm run dist       # 打包安装版 + 便携版到 dist/
-npm run stats      # 命令行对账（-- --fresh 忽略缓存全量重扫）
 ```
 
 ## 使用与设置
@@ -67,8 +54,8 @@ npm run stats      # 命令行对账（-- --fresh 忽略缓存全量重扫）
 | Codex | `~/.codex/sessions`、`archived_sessions` | 日志自带 5h / 周额度 |
 | Antigravity | `~/.gemini/antigravity/brain/*/…/transcript_full.jsonl` | 可选：读取本机语言服务（仅 5h） |
 | WorkBuddy | `~/.workbuddy-ai/projects/**/*.jsonl` | 本机读不到积分 |
-| ZCode（仅 Tauri 版） | `~/.zcode/cli/db/db.sqlite`（只读） | 本机无额度数据；格式依据社区文档，未在 ZCode 真机上实测 |
-| OpenCode（仅 Tauri 版） | `~/.local/share/opencode/opencode*.db`（只读，1.14+） | 本机无额度数据；格式依据社区文档，未在真机上实测 |
+| ZCode | `~/.zcode/cli/db/db.sqlite`（只读） | 本机无额度数据；格式依据社区文档，未在 ZCode 真机上实测 |
+| OpenCode | `~/.local/share/opencode/opencode*.db`（只读，1.14+） | 本机无额度数据；格式依据社区文档，未在真机上实测 |
 
 没有安装的 agent 不会显示：界面、设置页和托盘菜单都只列出本机检测到数据的 agent。
 
@@ -79,12 +66,12 @@ npm run stats      # 命令行对账（-- --fresh 忽略缓存全量重扫）
 - **所有数据只在本机处理，不上传任何内容，也没有任何遥测。**
 - 只读取上表中的本地日志，缓存和配置存放在 `%APPDATA%\token-widget\`。
 - **Antigravity 额度（可选，默认关闭）**：开启后会读取 Antigravity 语言服务进程的命令行参数以获得本机接口令牌，只访问 `127.0.0.1`；令牌只保存在内存，不打印、不写盘。这是未公开的内部接口，可能随版本变化，失败时静默回退。
-- **Claude 额度钩子（可选）**：在设置里启用后，会把 `tools/claude-statusline.js` 复制到 `%APPDATA%\token-widget\`，并修改 `~/.claude/settings.json` 的 `statusLine`。修改前会备份为 `settings.json.bak-<时间>`，且**不会覆盖你已有的 statusLine**。钩子只落盘额度百分比和重置时间。
+- **Claude 额度钩子（可选）**：在设置里启用后，会修改 `~/.claude/settings.json` 的 `statusLine`，让 Claude Code 调用本程序的 `--statusline` 子命令（不需要 Node）。修改前会备份为 `settings.json.bak-<时间>`，且**不会覆盖你已有的 statusLine**。钩子只落盘额度百分比和重置时间。
 - 套餐识别只提取套餐字段（读取 `~/.claude.json` 的账号类型、Codex `auth.json` 里令牌的套餐声明），不保存、不输出任何令牌或邮箱。
 
 ## 费用口径
 
-**界面上的金额是按各家 API 公开价折算的“等值金额”，不是实际扣款。** 订阅用户并不会按这个数字付费，它只用来衡量用量与订阅是否“回本”。`≈` 表示价格为估算（部分新模型没有可核实的公开价）。价格表见 `core/pricing.default.json`，可在 `%APPDATA%\token-widget\pricing.user.json` 覆盖，保存即生效；套餐月费见 `core/plans.default.json`，可在设置面板或 `plans.user.json` 覆盖。
+**界面上的金额是按各家 API 公开价折算的“等值金额”，不是实际扣款。** 订阅用户并不会按这个数字付费，它只用来衡量用量与订阅是否“回本”。`≈` 表示价格为估算（部分新模型没有可核实的公开价）。价格表见 `tauri/core/data/pricing.default.json`，可在 `%APPDATA%\token-widget\pricing.user.json` 覆盖，保存即生效；套餐月费见 `tauri/core/data/plans.default.json`，可在设置面板或 `plans.user.json` 覆盖。
 
 其它口径：
 
@@ -102,37 +89,47 @@ npm run stats      # 命令行对账（-- --fresh 忽略缓存全量重扫）
 ## 开发
 
 ```
-main.js            主进程：透明窗、收缩/贴靠动画、托盘、设置 IPC
-preload.js         IPC 桥
-renderer/          界面（原生 JS，无框架）
-core/              采集器、引擎、价格与套餐、图标提取、Antigravity 额度
-tools/             Claude statusLine 钩子
-scripts/           开发脚本（生成应用图标）
-test/              node:test 夹具测试
+renderer/            界面（原生 JS，无框架）；tauri-bridge.js 把 Tauri 的 invoke / 事件包装成 window.widget
+tauri/core/          数据引擎 agent_core（纯 Rust，不依赖窗口）：采集器、去重聚合、价格与套餐、Antigravity 额度、statusLine 钩子
+tauri/core/data/     默认价格表与套餐表（编译时嵌入）
+tauri/core/tests/    夹具测试
+tauri/src-tauri/     桌面壳：透明窗、收缩 / 贴靠动画、毛玻璃、托盘、设置、图标提取
+```
+
+命令行对账（输出完整快照 JSON，`--fresh` 忽略缓存全量重扫，不覆盖正式缓存）：
+
+```bash
+cd tauri
+cargo run -q --release -p agent_core --example cli -- --fresh --out snap.json
 ```
 
 ### 新增一个采集器
 
-在 `core/collectors.js` 里加一个对象，并导出到 `collectors` 数组：
+在 `tauri/core/src/collectors.rs` 里实现 `Collector`，并加进 `all_collectors()`：
 
-```js
-const mine = {
-  name: 'myagent',                    // agent id
-  discover() { return [/* 日志文件路径 */]; },
-  // st 是该文件的持久化状态（至少有 st.off 偏移）；用 emit(ev) 上报事件
-  scan(file, st, emit, now, setLimits) {
-    const r = readLines(file, st.off || 0, ['"usage"'], (text, ts) => { /* 解析一行，emit({...}) */ });
-    st.off = r.offset;
-    return r;
-  },
-};
+```rust
+pub struct Mine { home: PathBuf }
+
+impl Collector for Mine {
+    fn name(&self) -> &'static str { "myagent" }
+    fn discover(&self) -> Vec<PathBuf> { /* 日志文件路径 */ }
+    // st 是该文件的持久化状态（至少有 st.off 偏移）；用 sink.emit(Event { .. }) 上报事件
+    fn scan(&self, file: &Path, st: &mut FileState, sink: &mut dyn Sink, now: i64) -> io::Result<ReadResult> {
+        /* 用 read_lines 从 st.off 增量读取并解析 */
+    }
+}
 ```
 
-统一事件字段：`{agent, ts, model, sid, key, in, cr, cw5, cw1, out, rs, dur}`——`in` 未命中缓存的输入、`cr` 缓存读、`cw5/cw1` 5 分钟 / 1 小时缓存写、`out` 输出（含思考）、`rs` 其中的思考 token、`dur` 本次生成耗时（毫秒，未知填 0）；`key` 必须稳定且全局唯一，引擎靠它去重。然后在 `core/engine.js` 的 `AGENTS` 和 `renderer/app.js` 的 `AGENTS` 里注册，并在 `test/collectors.test.js` 加一个夹具测试。
+统一事件字段：`Event {agent, ts, model, sid, key, input, cr, cw5, cw1, out, rs, dur}`——`input` 未命中缓存的输入、`cr` 缓存读、`cw5/cw1` 5 分钟 / 1 小时缓存写、`out` 输出（含思考）、`rs` 其中的思考 token、`dur` 本次生成耗时（毫秒，未知填 0）；`key` 必须稳定且全局唯一，引擎靠它去重。然后在 `plans.rs` 的 `AGENTS`、`data/plans.default.json`、`src-tauri/src/settings.rs` 的 `AGENT_IDS` 和 `renderer/app.js` 的 `AGENTS` 里注册，并在 `tauri/core/tests/` 加一个夹具测试。
 
-### 调试参数
+### 调试开关（环境变量）
 
-直接运行 `node_modules\electron\dist\electron.exe .` 并追加：`--shot <png>`（截图后退出，注意会改写 `widget.json`）、`--open <agent>`、`--settings`、`--collapsed`、`--dock left|right|bottom|top`、`--expand-after`、`--theme light|dark`、`--hide <agent>`、`--no-icons`、`--eval "<js>"`、`--dev`。
+- `TOKEN_WIDGET_DIR=<目录>`：换一个数据目录（测试 / 便携使用）
+- `TW_BLUR=1|0`：强制开 / 关毛玻璃
+- `TW_TEXT_SCALE=1.1`：模拟 Windows“文本大小”110%
+- `TW_NO_ICONS=1`：不提取本机应用图标，全部显示首字母徽标（拍公开截图用）
+- `TW_PERF=1`：在 stderr 打印收缩 / 展开动画的帧耗时
+- 仅调试构建：`TW_DEBUG_STEPS="collapse;;expand;;dock:left;;js:<脚本>"` 按步骤自动操作窗口，`TW_DEBUG_NOHOVER=1` 忽略真实鼠标进出
 
 ## 许可证
 

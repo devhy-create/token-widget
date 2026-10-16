@@ -1,4 +1,4 @@
-//! 前端（renderer）通过 invoke 调用的命令，一一对应 Electron 版 preload.js 暴露的 window.widget 接口。
+//! 前端（renderer）通过 invoke 调用的命令，由 renderer/tauri-bridge.js 包装成 window.widget 接口。
 use crate::state::{Dock, Mode, Rect, Sh};
 use crate::{icons, menu, settings, window};
 use serde_json::Value;

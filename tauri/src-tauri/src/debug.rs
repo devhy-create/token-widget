@@ -1,4 +1,4 @@
-//! 仅调试构建可用的无人值守验证脚本（相当于 Electron 版的 --shot 那一套）。
+//! 仅调试构建可用的无人值守验证脚本。
 //! TW_DEBUG_STEPS：用 `;;` 分隔的步骤，每步之间间隔 1.5 秒，页面加载后开始执行：
 //!   collapse | expand | dock:left|right|bottom|top | js:<要在页面里执行的脚本>
 //! TW_DEBUG_NOHOVER=1：忽略界面上报的鼠标进出（避免真实鼠标干扰自动化验证）。

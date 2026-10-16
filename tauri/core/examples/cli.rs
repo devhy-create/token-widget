@@ -1,6 +1,6 @@
 //! 命令行对账工具：cargo run -p agent_core --example cli -- [--fresh] [--save] [--out <文件>]
 //! --fresh 忽略缓存重新全量扫描，数据写到临时目录（不覆盖正式缓存，除非加 --save）。
-//! 输出完整快照 JSON（stdout 或 --out 指定的文件），用于和 Electron 版 core/cli.js 对拍。
+//! 输出完整快照 JSON（stdout 或 --out 指定的文件），用于和各 agent 官方统计对账。
 use agent_core::{Engine, EngineOptions};
 use std::time::Instant;
 

@@ -76,20 +76,19 @@ fn read_claude_settings(f: &Path) -> Read {
     }
 }
 
-/// 是不是本小组件的钩子（Tauri 版的 --statusline，或 Electron 版的 node 脚本）
+/// 是不是本小组件的钩子（本程序的 --statusline，或旧版 v0.1 写入的 node 脚本 claude-statusline.js）
 fn is_ours(command: &str) -> bool {
     command.contains("claude-statusline.js") || (command.contains("--statusline") && command.contains("agent-monitor"))
 }
 
 fn hook_state() -> Value {
-    // node 字段保留给界面用：Tauri 版不依赖 node，恒为 true
     match read_claude_settings(&claude_settings_path()) {
-        Read::Unreadable => json!({ "state": "unreadable", "node": true }),
+        Read::Unreadable => json!({ "state": "unreadable" }),
         Read::Ok(m) => match m.get("statusLine").filter(|v| !v.is_null()) {
-            None => json!({ "state": "none", "node": true }),
+            None => json!({ "state": "none" }),
             Some(sl) => {
                 let cmd = sl.get("command").and_then(Value::as_str).unwrap_or("");
-                json!({ "state": if is_ours(cmd) { "ours" } else { "other" }, "node": true })
+                json!({ "state": if is_ours(cmd) { "ours" } else { "other" } })
             }
         },
     }
@@ -155,7 +154,7 @@ pub fn get_settings(sh: &Sh) -> Value {
         }).unwrap_or_default();
         json!({
             "id": id, "name": agent_name(id),
-            // 本机有没有这个 agent 的数据：没有的不在设置页列出（Electron 版没有该字段，界面按“有”处理）
+            // 本机有没有这个 agent 的数据：没有的不在设置页列出
             "found": found[i],
             "user": u.map(|u| json!({ "name": u.get("name"), "usd": js_number_or_zero(u.get("usd")) })),
             "detected": detected.get(*id).and_then(|p| p.as_ref()).map(|p| json!({ "name": p.name, "usd": p.usd })),
@@ -165,7 +164,7 @@ pub fn get_settings(sh: &Sh) -> Value {
     json!({
         "cfg": {
             "autoHide": c.auto_hide, "onTop": c.on_top, "theme": c.theme, "agQuota": c.ag_quota,
-            // canBlur：系统是否支持毛玻璃（Electron 版没有这个字段，设置页据此隐藏该行）
+            // canBlur：系统是否支持毛玻璃（不支持时设置页隐藏该行）
             "blur": c.blur, "canBlur": crate::fx::supported(),
             "openAtLogin": get_autostart(sh), "canAutostart": can_autostart(),
         },

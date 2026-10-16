@@ -1,7 +1,6 @@
-// Tauri 版的前端桥：把 Electron preload.js 暴露的 window.widget 接口换成 Tauri 的 invoke / listen。
-// 在 Electron 里 window.widget 已由 preload 注入，这里什么都不做。
+// 前端桥：用 Tauri 的 invoke / listen 实现界面（app.js）用到的 window.widget 接口。
 (() => {
-  if (window.widget || !window.__TAURI__) return;
+  if (!window.__TAURI__) return;
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const pending = [];

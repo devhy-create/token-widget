@@ -8,7 +8,7 @@ use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::path::Path;
 
-const DEFAULT_JSON: &str = include_str!("../../../core/plans.default.json");
+const DEFAULT_JSON: &str = include_str!("../data/plans.default.json");
 pub const AGENTS: [&str; 6] = ["claude", "codex", "antigravity", "workbuddy", "zcode", "opencode"];
 
 #[derive(Clone, Debug, Serialize, PartialEq)]

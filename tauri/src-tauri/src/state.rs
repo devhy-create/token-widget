@@ -8,7 +8,7 @@ use tauri::AppHandle;
 
 pub type Sh = Arc<Shared>;
 
-/// 用户配置，落盘到 widget.json；字段名与 Electron 版一致，两版可共用同一份文件
+/// 用户配置，落盘到 widget.json；字段名与旧版（v0.1）一致，升级后沿用原文件
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Cfg {
@@ -24,7 +24,7 @@ pub struct Cfg {
     pub theme: String,
     /// 毛玻璃（Win11 系统 Acrylic，圆角只能是系统的 8px）；默认开；关闭时回到透明边距 + 阴影的外观（圆角与开启时一致，同为 8px）；仅 Tauri 版支持
     pub blur: bool,
-    /// 不认识的键原样保留（别的版本写进去的字段，比如 Electron 版的 collapsed），避免保存时丢掉
+    /// 不认识的键原样保留（别的版本写进去的字段，比如旧版的 collapsed），避免保存时丢掉
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }

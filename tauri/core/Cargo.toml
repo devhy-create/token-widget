@@ -1,6 +1,6 @@
 [package]
 name = "agent_core"
-description = "Agent Monitor 的数据引擎：日志采集、去重、聚合、定价（由 Electron 版 core/ 移植）"
+description = "Agent Monitor 的数据引擎：日志采集、去重、聚合、定价"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

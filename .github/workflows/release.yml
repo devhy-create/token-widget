@@ -1,7 +1,6 @@
 name: Release
 
 # 推送 v* 标签时在 Windows 上打包 Tauri 版（NSIS 安装包 + 单文件便携版），上传到 GitHub Release。
-# Electron 版（v0.1）不再发布安装包，只保留源码运行方式（见 README）。
 on:
   push:
     tags: ['v*']

@@ -1,5 +1,5 @@
 //! 窗口行为：透明置顶小窗、收缩成胶囊 / 贴边、展开、缓动动画、越界拉回。
-//! 全部用逻辑像素计算（与 Electron 版的 DIP 一致），常量也沿用 Electron 版。
+//! 全部用逻辑像素计算。
 use crate::state::{Dock, Mode, Rect, Sh};
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};

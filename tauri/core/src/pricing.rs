@@ -1,9 +1,9 @@
 //! 模型定价：默认表 + 用户覆盖表，按模型名前缀（最长匹配）取价。
-//! 默认表直接引用 Electron 版的 core/pricing.default.json，两版共用一份数据。
+//! 默认表在 data/pricing.default.json，编译时嵌入。
 use serde_json::Value;
 use std::path::Path;
 
-const DEFAULT_JSON: &str = include_str!("../../../core/pricing.default.json");
+const DEFAULT_JSON: &str = include_str!("../data/pricing.default.json");
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PriceEntry {

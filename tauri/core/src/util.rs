@@ -65,9 +65,9 @@ pub fn non_empty(v: Option<&Value>) -> Option<&str> {
 }
 
 /// 小组件数据目录：%APPDATA%\token-widget（Windows）、~/Library/Application Support/token-widget（macOS）、~/.config/token-widget（其它）
-/// 与 Electron 版共用，已有缓存可以直接沿用。
+/// 与旧版（v0.1）相同，升级后已有缓存可以直接沿用。
 pub fn default_data_dir() -> PathBuf {
-    // TOKEN_WIDGET_DIR 与 Claude 钩子（claude-statusline）认的是同一个变量：测试 / 便携使用时可整体改目录
+    // TOKEN_WIDGET_DIR 与 Claude 钩子（--statusline）认的是同一个变量：测试 / 便携使用时可整体改目录
     if let Some(d) = std::env::var_os("TOKEN_WIDGET_DIR").filter(|d| !d.is_empty()) {
         return PathBuf::from(d);
     }

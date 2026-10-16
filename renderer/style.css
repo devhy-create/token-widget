@@ -1,5 +1,5 @@
 /* 苹果风格：圆角大卡片 + 轻玻璃质感 + 细分隔线；层级靠字重和灰度。深色模式跟随系统。
-   窗口是透明的，卡片四周 20px 留给阴影（与 main.js 的 M 一致）。 */
+   窗口是透明的，卡片四周 20px 留给阴影（与 tauri/src-tauri/src/window.rs 的 M 一致）。 */
 :root {
   --glass: rgba(247, 247, 250, 0.95);
   --fg: #1d1d1f;
@@ -75,7 +75,7 @@ body.is-pill #pill { opacity: 1; pointer-events: auto; transition: opacity 0.2s 
 #panel { position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; transition: opacity 0.2s ease 0.06s; }
 #panel::-webkit-scrollbar { display: none; }
 body.is-pill #panel { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
-/* 内容宽度固定为展开态卡片宽度（窗口侧 CARD_W / main.js 的 CARD_W = 380）：从很窄的竖向胶囊展开的动画过程中，
+/* 内容宽度固定为展开态卡片宽度（window.rs 的 CARD_W = 380）：从很窄的竖向胶囊展开的动画过程中，
    窗口还没长宽，若内容跟着窗口变窄就会换行、量出偏高的高度，导致先撑高再缩回去 */
 #content { padding: 0 18px 14px; width: 380px; box-sizing: border-box; }
 #top { display: flex; align-items: center; justify-content: space-between; height: 46px; -webkit-app-region: drag; }

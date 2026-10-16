@@ -3,7 +3,6 @@ node_modules/
 # 官方图标不随仓库分发：运行时从本机已安装的应用提取到 userData/icons
 assets/*.png
 !assets/tray.png
-dist/
 
 # Rust / Tauri 构建产物
 tauri/target/
@@ -11,3 +10,6 @@ tauri/target-new/
 
 # 自动生成的 Tauri schema
 tauri/src-tauri/gen/
+
+# 旧版（v0.1）的打包输出目录，本地可能还有残留
+dist/

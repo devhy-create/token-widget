@@ -19,37 +19,24 @@ A Windows desktop floating widget that shows, side by side and in real time, the
 
 ## Install
 
-Download from [Releases](../../releases) (the Tauri build, from v0.2 on: small, system acrylic blur, more agents):
+Download from [Releases](../../releases):
 
 | File | Description |
 | --- | --- |
-| `Agent Monitor_x.y.z_x64-setup.exe` | Installer (~4 MB, per-user, no admin needed); launch at login supported; bundles the WebView2 bootstrapper, which installs WebView2 online if the system lacks it |
+| `Agent.Monitor_x.y.z_x64-setup.exe` | Installer (~4 MB, per-user, no admin needed); launch at login supported; bundles the WebView2 bootstrapper, which installs WebView2 online if the system lacks it |
 | `Agent-Monitor-x.y.z-portable-x64.exe` | Single-file portable build (~6 MB), just double-click; needs WebView2 on the system (built into Windows 11) |
 
 > On first run Windows SmartScreen may warn about an "unknown publisher" (the project has no code-signing certificate). Click "More info → Run anyway".
 
-> If you ran the Electron build (v0.1) from source: both share the same name and **data directory** (`%APPDATA%\token-widget`) and cannot run at the same time. Quit / uninstall it before installing the Tauri build; your history is kept.
+### Build from source
 
-### Build from source (Tauri)
-
-Requires stable Rust + Node.js:
+Requires stable Rust + Node.js (Node is only used to invoke the Tauri CLI for packaging):
 
 ```bash
 cd tauri
 cargo test -p agent_core       # data-engine tests
+cargo run -p agent-monitor     # dev run
 npm install && npx tauri build # NSIS installer: target/release/bundle/nsis/
-```
-
-### Run from source (Electron build, v0.1)
-
-The earlier Electron implementation: no longer released as installers, supports only the first four agents. Requires Node.js 22+.
-
-```bash
-npm install
-npm start          # dev run ("launch at login" is unavailable in dev mode)
-npm test           # run the tests
-npm run dist       # build installer + portable into dist/
-npm run stats      # CLI reconciliation (-- --fresh ignores the cache and rescans everything)
 ```
 
 ## Usage & settings
@@ -67,8 +54,8 @@ npm run stats      # CLI reconciliation (-- --fresh ignores the cache and rescan
 | Codex | `~/.codex/sessions`, `archived_sessions` | 5h / weekly quota is in the logs |
 | Antigravity | `~/.gemini/antigravity/brain/*/…/transcript_full.jsonl` | optional: local language service (5h only) |
 | WorkBuddy | `~/.workbuddy-ai/projects/**/*.jsonl` | credits are not available locally |
-| ZCode (Tauri build only) | `~/.zcode/cli/db/db.sqlite` (read-only) | no quota data locally; format taken from community docs, not verified on a real ZCode install |
-| OpenCode (Tauri build only) | `~/.local/share/opencode/opencode*.db` (read-only, 1.14+) | no quota data locally; format taken from community docs, not verified on a real install |
+| ZCode | `~/.zcode/cli/db/db.sqlite` (read-only) | no quota data locally; format taken from community docs, not verified on a real ZCode install |
+| OpenCode | `~/.local/share/opencode/opencode*.db` (read-only, 1.14+) | no quota data locally; format taken from community docs, not verified on a real install |
 
 Agents that are not installed are not shown: the card list, the settings page and the tray menu only list agents whose data exists on this machine.
 
@@ -79,12 +66,12 @@ Planned: DeepSeek Harness (`dsh`, data under `~/.dsh/sessions/`). It is in devel
 - **Everything is processed locally. Nothing is uploaded and there is no telemetry.**
 - Only the local logs listed above are read; cache and settings live in `%APPDATA%\token-widget\`.
 - **Antigravity quota (optional, off by default):** when enabled, the app reads the command line of the Antigravity language-server process to obtain its local API token and only talks to `127.0.0.1`. The token stays in memory — it is never printed or written to disk. This is an undocumented internal API that may change between versions; on failure the app silently falls back.
-- **Claude quota hook (optional):** when enabled in Settings, `tools/claude-statusline.js` is copied to `%APPDATA%\token-widget\` and the `statusLine` entry in `~/.claude/settings.json` is modified. The file is backed up as `settings.json.bak-<timestamp>` first, and **an existing statusLine of yours is never overwritten**. The hook only stores quota percentages and reset times.
+- **Claude quota hook (optional):** when enabled in Settings, the `statusLine` entry in `~/.claude/settings.json` is set so that Claude Code calls this app's `--statusline` subcommand (no Node needed). The file is backed up as `settings.json.bak-<timestamp>` first, and **an existing statusLine of yours is never overwritten**. The hook only stores quota percentages and reset times.
 - Plan detection extracts only the plan field (account type from `~/.claude.json`, the plan claim inside the Codex `auth.json` token). No token or e-mail is stored or printed.
 
 ## About the cost numbers
 
-**Amounts shown are "equivalent value" computed from each vendor's public API prices — NOT what you are actually charged.** Subscribers do not pay these amounts; they are only meant to gauge usage and whether a subscription "pays for itself". `≈` marks an estimated price (some new models have no verifiable public price). The price table is `core/pricing.default.json`; override it in `%APPDATA%\token-widget\pricing.user.json` (takes effect on save). Monthly plan prices are in `core/plans.default.json` and can be overridden in Settings or `plans.user.json`.
+**Amounts shown are "equivalent value" computed from each vendor's public API prices — NOT what you are actually charged.** Subscribers do not pay these amounts; they are only meant to gauge usage and whether a subscription "pays for itself". `≈` marks an estimated price (some new models have no verifiable public price). The price table is `tauri/core/data/pricing.default.json`; override it in `%APPDATA%\token-widget\pricing.user.json` (takes effect on save). Monthly plan prices are in `tauri/core/data/plans.default.json` and can be overridden in Settings or `plans.user.json`.
 
 Other conventions:
 
@@ -102,37 +89,47 @@ Other conventions:
 ## Development
 
 ```
-main.js            main process: transparent window, collapse/dock animation, tray, settings IPC
-preload.js         IPC bridge
-renderer/          UI (vanilla JS, no framework)
-core/              collectors, engine, pricing & plans, icon extraction, Antigravity quota
-tools/             Claude statusLine hook
-scripts/           dev scripts (app icon generator)
-test/              node:test fixture tests
+renderer/            UI (vanilla JS, no framework); tauri-bridge.js wraps Tauri invoke / events as window.widget
+tauri/core/          data engine agent_core (pure Rust, no window): collectors, de-dup & aggregation, pricing & plans, Antigravity quota, statusLine hook
+tauri/core/data/     default price and plan tables (embedded at compile time)
+tauri/core/tests/    fixture tests
+tauri/src-tauri/     desktop shell: transparent window, collapse / dock animation, acrylic blur, tray, settings, icon extraction
+```
+
+CLI reconciliation (prints a full snapshot as JSON; `--fresh` ignores the cache and rescans everything without touching the real cache):
+
+```bash
+cd tauri
+cargo run -q --release -p agent_core --example cli -- --fresh --out snap.json
 ```
 
 ### Adding a collector
 
-Add an object to `core/collectors.js` and export it in the `collectors` array:
+Implement `Collector` in `tauri/core/src/collectors.rs` and add it to `all_collectors()`:
 
-```js
-const mine = {
-  name: 'myagent',                    // agent id
-  discover() { return [/* log file paths */]; },
-  // st is the persisted per-file state (at least st.off, the byte offset); report events via emit(ev)
-  scan(file, st, emit, now, setLimits) {
-    const r = readLines(file, st.off || 0, ['"usage"'], (text, ts) => { /* parse a line, emit({...}) */ });
-    st.off = r.offset;
-    return r;
-  },
-};
+```rust
+pub struct Mine { home: PathBuf }
+
+impl Collector for Mine {
+    fn name(&self) -> &'static str { "myagent" }
+    fn discover(&self) -> Vec<PathBuf> { /* log file paths */ }
+    // st is the persisted per-file state (at least st.off, the byte offset); report events via sink.emit(Event { .. })
+    fn scan(&self, file: &Path, st: &mut FileState, sink: &mut dyn Sink, now: i64) -> io::Result<ReadResult> {
+        /* read incrementally from st.off with read_lines and parse */
+    }
+}
 ```
 
-Unified event fields: `{agent, ts, model, sid, key, in, cr, cw5, cw1, out, rs, dur}` — `in` uncached input, `cr` cache read, `cw5/cw1` 5-minute / 1-hour cache write, `out` output (including thinking), `rs` thinking tokens (display only), `dur` generation time in ms (0 if unknown). `key` must be stable and globally unique — the engine de-duplicates by it. Then register the agent in `AGENTS` in `core/engine.js` and `renderer/app.js`, and add a fixture test to `test/collectors.test.js`.
+Unified event fields: `Event {agent, ts, model, sid, key, input, cr, cw5, cw1, out, rs, dur}` — `input` uncached input, `cr` cache read, `cw5/cw1` 5-minute / 1-hour cache write, `out` output (including thinking), `rs` thinking tokens (display only), `dur` generation time in ms (0 if unknown). `key` must be stable and globally unique — the engine de-duplicates by it. Then register the agent in `AGENTS` in `plans.rs`, `data/plans.default.json`, `AGENT_IDS` in `src-tauri/src/settings.rs` and `AGENTS` in `renderer/app.js`, and add a fixture test under `tauri/core/tests/`.
 
-### Debug flags
+### Debug switches (environment variables)
 
-Run `node_modules\electron\dist\electron.exe .` with: `--shot <png>` (screenshot then exit; note it rewrites `widget.json`), `--open <agent>`, `--settings`, `--collapsed`, `--dock left|right|bottom|top`, `--expand-after`, `--theme light|dark`, `--hide <agent>`, `--no-icons`, `--eval "<js>"`, `--dev`.
+- `TOKEN_WIDGET_DIR=<dir>`: use another data directory (testing / portable use)
+- `TW_BLUR=1|0`: force acrylic blur on / off
+- `TW_TEXT_SCALE=1.1`: simulate Windows "Text size" at 110%
+- `TW_NO_ICONS=1`: skip extracting installed app icons and show letter badges (for public screenshots)
+- `TW_PERF=1`: print collapse / expand animation frame timings to stderr
+- Debug builds only: `TW_DEBUG_STEPS="collapse;;expand;;dock:left;;js:<script>"` drives the window step by step; `TW_DEBUG_NOHOVER=1` ignores real mouse enter / leave
 
 ## License
 

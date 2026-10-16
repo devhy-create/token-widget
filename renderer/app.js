@@ -5,7 +5,6 @@ const AGENTS = [
   { id: 'codex', name: 'Codex', dark: true },
   { id: 'antigravity', name: 'Antigravity' },
   { id: 'workbuddy', name: 'WorkBuddy' },
-  // 以下仅 Tauri 版的数据引擎支持；Electron 版快照里没有它们，按“未检测到”处理
   { id: 'zcode', name: 'ZCode' },
   { id: 'opencode', name: 'OpenCode' },
 ];
@@ -302,7 +301,7 @@ function render(s) {
     tU += d.today.usd; tT += d.today.tokens; estT = estT || d.today.est;
   }
 
-  // 第一轮文件发现还没完成时先不提示“没检测到”（Electron 版快照没有 booted 字段，按已完成处理）
+  // 第一轮文件发现还没完成时先不提示“没检测到”
   $('#empty').hidden = s.booted === false || AGENTS.some((a) => shown(s, a.id));
   // 底部一行：今日合计（金额是 API 公开价折算值，不是实际扣款）
   setHtml($('#foot'), `<span>今日合计 <b>${usd(tU, estT)}</b> · ${fmtTok(tT)} token</span><span title="金额按 API 公开价折算（≈ 为估价），不是实际扣款">折算值</span>`);
@@ -332,14 +331,13 @@ function hookHtml(h) {
   const txt = {
     none: '本地日志里没有 Claude 的 5h / 周额度，需要给 Claude Code 配一个 statusLine 钩子。启用前会自动备份 settings.json。注意：只有命令行版 Claude Code 会触发钩子，桌面 App 不会。',
     ours: '已启用。命令行版 Claude Code 每次刷新状态栏就会更新额度；桌面 App 不会触发，只用桌面版时数字会停在上次。',
-    other: '检测到你已有自己的 statusLine，为避免覆盖不会自动修改。可在其脚本里调用 tools/claude-statusline.js 合并。',
+    other: '检测到你已有自己的 statusLine，为避免覆盖不会自动修改。可在其脚本里把 Claude Code 传入的 JSON 转给 agent-monitor.exe --statusline 合并。',
     unreadable: '~/.claude/settings.json 读取失败，为安全起见不修改。',
   }[h.state];
   let btn = '';
-  if (h.state === 'none') btn = h.node ? '<button class="sbtn" data-hook="1">启用</button>' : '<button class="sbtn" disabled>需要 Node</button>';
+  if (h.state === 'none') btn = '<button class="sbtn" data-hook="1">启用</button>';
   else if (h.state === 'ours') btn = '<button class="sbtn" data-hook="0">停用</button>';
-  const warn = h.state === 'none' && !h.node ? '<div class="snote">没有检测到 node。钩子靠 node 运行，请先安装 Node.js。</div>' : '';
-  return `<div class="sh">Claude 额度（5h / 周）</div><div class="sg"><div class="srow hookrow"><span class="snote">${txt}</span>${btn}</div>${warn}</div>`;
+  return `<div class="sh">Claude 额度（5h / 周）</div><div class="sg"><div class="srow hookrow"><span class="snote">${txt}</span>${btn}</div></div>`;
 }
 
 function renderSettings(d) {

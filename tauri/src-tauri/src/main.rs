@@ -86,7 +86,7 @@ fn create_window(sh: &Sh) -> tauri::Result<()> {
         _ => None,
     };
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()));
-    // 省资源（沿用 Electron 版的做法）：关硬件加速、限制 JS 堆、关掉用不到的 Chromium 特性。
+    // 省资源：关硬件加速、限制 JS 堆、关掉用不到的 Chromium 特性。
     // 注意 additional_browser_args 会替换 Tauri 的默认参数，所以默认的 disable-features 要一并带上。
     #[cfg(windows)]
     let builder = builder.additional_browser_args(

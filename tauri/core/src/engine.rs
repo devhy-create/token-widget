@@ -1,5 +1,5 @@
 //! 引擎：驱动采集器增量扫描、去重、按日/小时聚合、计算实时速度、持久化缓存。
-//! 缓存格式（cache.json，v:1）与 Electron 版完全一致，两版可以共用同一份缓存。
+//! 缓存格式（cache.json，v:1）与旧版（v0.1）一致，升级后沿用已有缓存。
 use crate::collectors::{all_collectors, Collector, Event, FileState, Sink};
 use crate::plans::{self, Plan, AGENTS};
 use crate::pricing::{Bucket, PriceTable};
@@ -215,7 +215,7 @@ pub struct ScanJob {
 }
 
 pub struct EngineOptions {
-    /// 数据目录；None 用默认位置（与 Electron 版共用）
+    /// 数据目录；None 用默认位置（见 util::default_data_dir）
     pub dir: Option<PathBuf>,
     /// 用户主目录（各 agent 日志所在）；None 取系统主目录。测试里指向临时目录
     pub home: Option<PathBuf>,
