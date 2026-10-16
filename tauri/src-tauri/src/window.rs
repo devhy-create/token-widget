@@ -2,7 +2,7 @@
 //! 全部用逻辑像素计算。
 use crate::state::{Dock, Mode, Rect, Sh};
 use serde_json::json;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow};
 
@@ -397,12 +397,39 @@ pub fn expand(sh: &Sh) {
 
 /// 光标是否在“卡片”内（透明的阴影边距不算）
 fn cursor_inside(sh: &Sh) -> bool {
-    let Some(w) = win(sh) else { return false };
+    cursor_inside_opt(sh).unwrap_or(false)
+}
+
+/// 同上；取不到窗口或光标位置时返回 None（定时检查据此跳过，不误收缩）
+fn cursor_inside_opt(sh: &Sh) -> Option<bool> {
+    let w = win(sh)?;
     let sf = w.scale_factor().unwrap_or(1.0);
-    let Ok(p) = w.cursor_position() else { return false };
+    let p = w.cursor_position().ok()?;
     let (px, py) = (p.x / sf, p.y / sf);
     let b = bounds(&w);
-    px >= b.x + margin() && px < b.x + b.w - margin() && py >= b.y + margin() && py < b.y + b.h - margin()
+    Some(px >= b.x + margin() && px < b.x + b.w - margin() && py >= b.y + margin() && py < b.y + b.h - margin())
+}
+
+/// 上一次定时检查时光标是否在卡片外
+static WAS_OUTSIDE: AtomicBool = AtomicBool::new(false);
+
+/// 兜底的自动收缩：由推送线程每秒调用一次。
+/// 平时靠界面上报的鼠标进出事件收缩；但光标被程序“瞬移”时（如 PowerToys Mouse Without Borders
+/// 切到另一台电脑时把光标藏到屏幕边缘、切回时再放回来）网页收不到离开事件，窗口会一直展开。
+/// 这里直接看光标实际位置：展开状态下连续两次（约 1~2 秒）都在卡片外就收缩。
+pub fn check_hover(sh: &Sh) {
+    // 先单独取 mode：sh.ws() 的锁守卫是临时值，和 can_auto_hide（内部也锁 ws）写在同一个表达式里会自锁
+    let expanded = sh.ws().mode == Mode::Expanded;
+    let active = expanded && visible(sh) && can_auto_hide(sh);
+    #[cfg(debug_assertions)]
+    let active = active && !crate::debug::NO_HOVER.load(Ordering::Relaxed);
+    let outside = active && cursor_inside_opt(sh) == Some(false);
+    if outside && WAS_OUTSIDE.load(Ordering::Relaxed) {
+        WAS_OUTSIDE.store(false, Ordering::Relaxed);
+        collapse(sh);
+    } else {
+        WAS_OUTSIDE.store(outside, Ordering::Relaxed);
+    }
 }
 
 pub fn can_auto_hide(sh: &Sh) -> bool {

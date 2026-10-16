@@ -63,6 +63,7 @@ fn spawn_push_thread(sh: &Sh) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(1));
         window::check_text_scale(&sh);
+        window::check_hover(&sh);
         window::push(&sh);
     });
 }
