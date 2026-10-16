@@ -4,7 +4,7 @@
 
 一个 Windows 桌面悬浮小组件：在同一块屏幕上实时显示 **Claude / Codex / Antigravity / WorkBuddy** 的 token 速度（分模型）、5 小时 / 每周额度、今日花费与 token 用量。苹果风格、占用低，鼠标移开自动收缩成胶囊（可贴顶 / 底 / 左 / 右），移入即展开。
 
-<!-- 截图暂不随首次提交（旧截图含第三方官方图标和真实花费），补好新截图后再启用：![截图](docs/screenshot.png) -->
+![截图](docs/screenshot.png)
 
 > 本项目与 Anthropic、OpenAI、Google、腾讯等公司没有任何隶属或合作关系；文中出现的产品名仅用于说明数据来源，相关商标归各自所有者。
 

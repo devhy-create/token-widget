@@ -4,7 +4,7 @@ English · [中文](README.md)
 
 A Windows desktop floating widget that shows, side by side and in real time, the token speed (per model), 5-hour / weekly quota, and today's cost and token usage of **Claude / Codex / Antigravity / WorkBuddy**. Apple-style look, low resource use. It collapses into a pill when the mouse leaves (docking to the top / bottom / left / right edge) and expands when the mouse comes back.
 
-<!-- Screenshot is left out of the first commit (the old one shows third-party logos and real spending); re-enable after retaking: ![Screenshot](docs/screenshot.png) -->
+![Screenshot](docs/screenshot.png)
 
 > This project is not affiliated with or endorsed by Anthropic, OpenAI, Google, Tencent or any other vendor. Product names are used only to describe where the data comes from; all trademarks belong to their respective owners.
 

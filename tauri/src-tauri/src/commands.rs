@@ -87,6 +87,10 @@ pub fn hover(sh: State<'_, Sh>, inside: bool) {
 /// 图标：从本机应用提取并缓存（放在异步线程，不阻塞界面）
 #[tauri::command]
 pub async fn icons(sh: State<'_, Sh>) -> Result<Value, String> {
+    // 测试开关 TW_NO_ICONS=1：不用本机应用图标，全部显示首字母徽标（拍公开截图时避免出现第三方官方图标）
+    if std::env::var("TW_NO_ICONS").is_ok_and(|v| v == "1") {
+        return Ok(serde_json::json!({}));
+    }
     let dir = sh.engine().dir().join("icons");
     tauri::async_runtime::spawn_blocking(move || icons::resolve_icons(&dir, &settings::AGENT_IDS))
         .await
