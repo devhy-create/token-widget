@@ -1,0 +1,21 @@
+[package]
+name = "agent_core"
+description = "Agent Monitor 的数据引擎：日志采集、去重、聚合、定价（由 Electron 版 core/ 移植）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# preserve_order：写回用户 JSON 文件时保持键顺序，与 JS 版 JSON.stringify 行为一致
+serde_json = { version = "1", features = ["preserve_order"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+regex = "1"
+base64 = "0.22"
+md5 = "0.7"
+memchr = "2"
+# 读 ZCode / OpenCode 等把用量存在 SQLite 里的 agent；bundled 自带 SQLite，用户机器上不需要装
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"

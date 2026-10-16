@@ -1,0 +1,57 @@
+{
+  "name": "token-widget",
+  "version": "0.1.0",
+  "description": "桌面悬浮小组件：实时显示 Claude / Codex / Antigravity / WorkBuddy 的 token 速度、额度与用量",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "Agent Monitor contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OWNER/token-widget.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "stats": "node core/cli.js",
+    "dist": "electron-builder --win nsis portable --publish never",
+    "dist:portable": "electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.agentmonitor.widget",
+    "productName": "Agent Monitor",
+    "copyright": "Copyright © 2026 Agent Monitor contributors",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "core/**/*",
+      "renderer/**/*",
+      "tools/**/*",
+      "assets/tray.png",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
+  }
+}

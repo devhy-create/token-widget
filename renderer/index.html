@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent 监控</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="card">
+  <!-- 收缩态：顶部小胶囊，一行显示各 agent 的实时速度（图标由 app.js 动态生成） -->
+  <div id="pill">
+    <span class="pt" id="pill-total"></span>
+  </div>
+
+  <!-- 展开态 -->
+  <div id="panel">
+    <div id="content">
+      <header id="top">
+        <span class="brand"><span id="brand-t">Agent 监控</span><span id="scan" class="scan" hidden></span></span>
+        <span class="btns">
+          <button id="btn-pin" title="固定展开（不自动收缩）" aria-label="固定">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5l4 4-2 .8-2.2 2.2.4 2.6-1 1-2.6-2.6L3 14.2 2.8 13.2l3.7-3.6L3.9 7l1-1 2.6.4L9.7 4.2z"/></svg>
+          </button>
+          <button id="btn-set" title="设置" aria-label="设置"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+          <button id="btn-menu" title="菜单" aria-label="菜单">⋯</button>
+          <button id="btn-close" title="隐藏到托盘" aria-label="隐藏">✕</button>
+        </span>
+      </header>
+      <main id="agents"></main>
+      <div id="empty" class="empty" hidden>没有检测到已安装的 Agent，也可能被隐藏了（托盘菜单 → 显示的 Agent）</div>
+      <section id="settings" hidden></section>
+      <footer id="foot"></footer>
+    </div>
+  </div>
+</div>
+<script src="tauri-bridge.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "说明": "订阅套餐的月费（美元）。key 为检测到的套餐标识；est=true 表示价格是估算。可在用户数据目录 token-widget 下的 plans.user.json 里按 agent 覆盖，例如 {\"antigravity\": {\"name\": \"AI Pro\", \"usd\": 19.99}}",
+  "claude": {
+    "free":    { "name": "Free",    "usd": 0 },
+    "pro":     { "name": "Pro",     "usd": 20 },
+    "max_5x":  { "name": "Max 5x",  "usd": 100 },
+    "max_20x": { "name": "Max 20x", "usd": 200 },
+    "max":     { "name": "Max",     "usd": 100, "est": true },
+    "team":    { "name": "Team",    "usd": 30, "est": true }
+  },
+  "codex": {
+    "free":     { "name": "Free",     "usd": 0 },
+    "go":       { "name": "Go",       "usd": 8,   "est": true },
+    "plus":     { "name": "Plus",     "usd": 20 },
+    "pro":      { "name": "Pro",      "usd": 200 },
+    "prolite":  { "name": "Pro Lite", "usd": 100, "est": true },
+    "team":     { "name": "Team",     "usd": 30,  "est": true },
+    "business": { "name": "Business", "usd": 30,  "est": true }
+  },
+  "antigravity": {
+    "free":  { "name": "Free",     "usd": 0 },
+    "pro":   { "name": "AI Pro",   "usd": 19.99 },
+    "ultra": { "name": "AI Ultra", "usd": 249.99 }
+  },
+  "workbuddy": {},
+  "zcode": {},
+  "opencode": {}
+}

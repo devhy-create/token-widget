@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Agent Monitor",
+  "version": "0.2.0",
+  "identifier": "com.agentmonitor.widget",
+  "build": {
+    "frontendDist": "../../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "publisher": "Agent Monitor contributors",
+    "copyright": "Copyright © 2026 Agent Monitor contributors",
+    "category": "Utility",
+    "shortDescription": "桌面悬浮小组件：实时显示各 AI 编程 agent 的 token 速度、额度与用量",
+    "licenseFile": "../../LICENSE",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "compression": "lzma",
+        "installerHooks": "installer-hooks.nsh"
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+name: Release
+
+# 推送 v* 标签时在 Windows 上打包安装版 + 便携版，并上传到 GitHub Release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npx electron-builder --win nsis portable --publish never
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+          generate_release_notes: true
+
+  # Tauri 版（v0.2）：NSIS 安装包 + 单文件便携版（便携版依赖系统已装 WebView2，Win11 自带）
+  tauri-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tauri/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri
+      - run: cargo test -p agent_core
+        working-directory: tauri
+      - run: npm ci
+        working-directory: tauri
+      - run: npx tauri build
+        working-directory: tauri
+      - name: 整理产物
+        shell: pwsh
+        working-directory: tauri
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item target/release/bundle/nsis/*-setup.exe out/
+          $v = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          Copy-Item target/release/agent-monitor.exe "out/Agent-Monitor-$v-portable-x64.exe"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: tauri/out/*.exe
+          generate_release_notes: true
