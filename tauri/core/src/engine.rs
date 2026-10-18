@@ -102,6 +102,31 @@ struct RingEv {
     dur: i64,
 }
 
+/// 周额度重置时间的抖动容忍（秒）：同一窗口里日志写的 resets_at 会漂几十秒
+const RESET_JITTER_SEC: f64 = 600.0;
+
+/// 判断账号是否切换过，返回“当前周窗口里切换发生的时间”（毫秒），没切换过返回 None。
+/// 没有账号标识可用，只能靠额度窗口判断：旧窗口还没到期，周重置时间却变了，说明换成了另一个账号
+/// （旧窗口自然到期后换新窗口不算切换）。切换时间已记录且重置时间没变则沿用。
+fn detect_switch(cur: &Value, new_secondary: &Value, ts: i64) -> Option<i64> {
+    let reset_of = |v: &Value| v.get("resets_at").and_then(Value::as_f64);
+    let old_reset = cur.get("secondary").and_then(reset_of);
+    let new_reset = reset_of(new_secondary);
+    let (Some(o), Some(n)) = (old_reset, new_reset) else {
+        // 新事件没带周额度：沿用之前的记录
+        return cur.get("since").and_then(Value::as_i64);
+    };
+    if (n - o).abs() <= RESET_JITTER_SEC {
+        return cur.get("since").and_then(Value::as_i64);
+    }
+    // 重置时间变了：旧窗口此刻还有效（至少还剩 1 分钟）才算换了账号
+    if o * 1000.0 > ts as f64 + 60_000.0 {
+        Some(ts)
+    } else {
+        None
+    }
+}
+
 // ---------------------------------------------------------------- 账本（事件入账的落点）
 /// 去重集合 + 日/小时聚合 + 实时事件环 + 额度窗口。实现 Sink，供采集器直接写入。
 #[derive(Default)]
@@ -142,8 +167,11 @@ impl Ledger {
             self.log_plans.insert(agent.to_string(), p.to_string());
         }
         let pick = |k: &str| rl.get(k).filter(|v| !v.is_null()).cloned().unwrap_or(Value::Null);
+        let secondary = pick("secondary");
+        let since = self.limits.get(agent).and_then(|cur| detect_switch(cur, &secondary, ts));
         self.limits.insert(agent.to_string(), json!({
-            "ts": ts, "plan": plan, "primary": pick("primary"), "secondary": pick("secondary"), "models": pick("models"),
+            "ts": ts, "plan": plan, "primary": pick("primary"), "secondary": secondary, "models": pick("models"),
+            "since": since,
         }));
         self.dirty = true;
     }
@@ -612,7 +640,12 @@ impl Engine {
             w_start = midnight_of(monday);
             w_end = w_start + 7 * 86_400_000;
         }
-        let w_used = self.hours_between(w_start, now, ag);
+        // 窗口内切换过账号：只统计切换之后的用量（账本不分账号，切换前的用量属于另一个账号）。
+        // 账本按小时记，切换所在的那个小时会整小时计入，误差在一小时内
+        let since = limits.and_then(|l| l.get("since")).and_then(Value::as_i64).filter(|s| kind == "window" && *s > w_start && *s < now);
+        let w_used = self.hours_between(since.unwrap_or(w_start), now, ag);
+        // 订阅回本用：切换之后（最多回溯 30 天）的用量
+        let since_used = since.map(|s| slim(&self.hours_between(s.max(now - 30 * 86_400_000), now, ag)));
         let w_frac = ((now - w_start) as f64 / (w_end - w_start) as f64).clamp(0.0, 1.0);
         let w_ok = w_frac >= 0.04; // 周期刚开始时外推不可靠
         let used_pct = sec.and_then(|s| s.get("used_percent")).and_then(Value::as_f64);
@@ -624,6 +657,7 @@ impl Engine {
             _ => None,
         };
         let week = json!({
+            "since": since, "sinceUsed": since_used,
             "quotaWeekUsd": quota_week,
             "quotaMonthUsd": quota_week.map(|q| q * 52.0 / 12.0),
             "kind": kind, "start": w_start, "end": w_end, "frac": w_frac, "ok": w_ok, "used": slim(&w_used),
@@ -763,5 +797,61 @@ impl Engine {
             "model": cur.map(|b| b.2.clone()).or_else(|| last.map(|l| l.model.clone())),
             "models": models.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
         })
+    }
+}
+
+#[cfg(test)]
+mod switch_tests {
+    use super::*;
+
+    const T: i64 = 1_792_000_000_000; // 任取的事件时间（毫秒）
+
+    fn lim(reset: f64, since: Option<i64>) -> Value {
+        json!({ "secondary": { "resets_at": reset }, "since": since })
+    }
+    fn sec(reset: f64) -> Value {
+        json!({ "resets_at": reset })
+    }
+
+    #[test]
+    fn jitter_is_not_a_switch() {
+        // 同一窗口里 resets_at 漂几十秒，不算切换
+        let cur = lim(1_792_600_000.0, None);
+        assert_eq!(detect_switch(&cur, &sec(1_792_600_036.0), T), None);
+    }
+
+    #[test]
+    fn changed_reset_while_window_active_is_switch() {
+        // 旧窗口还有几天才到期，重置时间却变了：换了账号
+        let cur = lim(1_792_600_000.0, None);
+        assert_eq!(detect_switch(&cur, &sec(1_792_900_000.0), T), Some(T));
+    }
+
+    #[test]
+    fn natural_rollover_is_not_switch() {
+        // 旧窗口已经到期，新窗口开始：不是切换，之前记的切换时间作废
+        let cur = lim(1_791_999_000.0, Some(T - 1000));
+        assert_eq!(detect_switch(&cur, &sec(1_792_603_800.0), T), None);
+    }
+
+    #[test]
+    fn since_is_kept_while_reset_unchanged() {
+        let cur = lim(1_792_600_000.0, Some(T - 5000));
+        assert_eq!(detect_switch(&cur, &sec(1_792_600_020.0), T), Some(T - 5000));
+        // 新事件没带周额度时也沿用
+        assert_eq!(detect_switch(&cur, &Value::Null, T), Some(T - 5000));
+    }
+
+    #[test]
+    fn put_limits_records_since() {
+        let mut l = Ledger::default();
+        let rl = |r: f64| json!({ "secondary": { "resets_at": r, "used_percent": 1.0 } });
+        l.put_limits("codex", T, &rl(1_792_600_000.0));
+        assert!(l.limits["codex"]["since"].is_null());
+        l.put_limits("codex", T + 60_000, &rl(1_792_900_000.0));
+        assert_eq!(l.limits["codex"]["since"].as_i64(), Some(T + 60_000));
+        // 之后同一窗口的事件不改变切换时间
+        l.put_limits("codex", T + 120_000, &rl(1_792_900_004.0));
+        assert_eq!(l.limits["codex"]["since"].as_i64(), Some(T + 60_000));
     }
 }

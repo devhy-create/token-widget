@@ -180,14 +180,18 @@ function tilesHtml(d) {
   }
   // 订阅回本按近 30 天滚动用量算（订阅周期不是自然月），只占一行小字，不再单独占一格；
   // 此时上面两格各占一半宽
-  const d30 = d.d30;
+  // 切换过账号：账本不分账号，每周 / 额度 / 回本只统计切换之后的用量，并提示一行
+  const sw = p.week.since != null ? new Date(p.week.since) : null;
+  const p2 = (n) => String(n).padStart(2, '0');
+  const swNote = sw ? `<div class="tnote">已切换账号：金额只统计 ${sw.getMonth() + 1}/${sw.getDate()} ${p2(sw.getHours())}:${p2(sw.getMinutes())} 之后</div>` : '';
+  const d30 = sw && p.week.sinceUsed ? p.week.sinceUsed : d.d30;
   if (price > 0) {
     const good = d30.usd >= price ? ' good' : '';
-    const note = `<div class="tnote">订阅回本 <b class="${good}">${mult(d30.usd, price)}</b> · 近 30 天 ${usd(d30.usd, d30.est)} / 月费 $${price}</div>`;
-    return `<div class="tiles2">${t1 + t2}</div>${note}`;
+    const note = `<div class="tnote">订阅回本 <b class="${good}">${mult(d30.usd, price)}</b> · ${sw ? '切换后' : '近 30 天'} ${usd(d30.usd, d30.est)} / 月费 $${price}</div>`;
+    return `<div class="tiles2">${t1 + t2}</div>${note}${swNote}`;
   }
   const t3 = price === 0 ? tile('套餐', 'Free', '无订阅费') : tile('近 5 小时', usd(p.five.usd, p.five.est), fmtTok(p.five.tokens));
-  return t1 + t2 + t3;
+  return t1 + t2 + t3 + swNote;
 }
 
 // 没有额度数据的 Agent：第二行改显示套餐月费 + 近 30 天折算（订阅回本倍数）
