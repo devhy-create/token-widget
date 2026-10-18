@@ -82,7 +82,7 @@ Other conventions:
 
 - **Claude 5h / weekly quota only works with the command-line Claude Code — the desktop app does not trigger the hook.** This is a limitation of the Claude Code desktop app. If the data is older than 10 minutes the widget says "quota data updated x ago".
 - Antigravity only exposes a 5-hour window, no weekly quota.
-- WorkBuddy credit balance lives in the cloud and is not in local logs; the widget shows "monthly price + this month's equivalent" instead.
+- WorkBuddy credit balance lives in the cloud and is not in local logs; the widget shows "monthly price + last-30-days equivalent" instead.
 - Tested on Windows only. The registry / PowerShell parts (icon extraction, Antigravity quota, hook management) are Windows-only and fall back elsewhere.
 - Official icons are not shipped in the repo: they are extracted at runtime from the apps installed on your machine and cached in `%APPDATA%\token-widget\icons`; a letter badge is shown when not found. For local use only.
 

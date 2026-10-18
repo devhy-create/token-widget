@@ -165,22 +165,33 @@ function tilesHtml(d) {
   const wkTitle = p.week.kind === 'window' ? '每周' : '本周';
   const pctp = p.week.pctProj != null ? ` · <span class="${p.week.pctProj >= 100 ? 'hot' : ''}">${Math.round(p.week.pctProj)}%</span>` : '';
   const t1 = tile(wkTitle, usd(p.week.used.usd, p.week.used.est), p.week.ok ? `预计 ${usd(p.week.projUsd, p.week.used.est)}${pctp}` : '刚开始');
-  // 本月卡片：主数字显示预计整月用量，已用金额放副标题；月初外推不可靠时退回显示已用
-  const t2 = p.month.ok
-    ? tile('本月预计', usd(p.month.projUsd, p.month.used.est), `已用 ${usd(p.month.used.usd, p.month.used.est)}`)
-    : tile('本月', usd(p.month.used.usd, p.month.used.est), '月初');
+  // 第二格：有额度窗口的 Agent 显示折算月度额度（订阅周期与自然月不对应，按周额度百分比反推）；
+  // 没有额度窗口的退回自然月的预计用量
+  let t2;
+  if (p.week.kind === 'window') {
+    const pct = p.week.pct != null ? `${Math.round(p.week.pct)}%` : '';
+    t2 = p.week.quotaMonthUsd != null
+      ? tile('月度额度', usd(p.week.quotaMonthUsd, p.week.used.est), `周 ${usd(p.week.quotaWeekUsd, p.week.used.est)} · 已用 ${pct}`)
+      : tile('月度额度', '—', pct ? `已用 ${pct}，用量太少暂不估算` : '暂无额度数据');
+  } else {
+    t2 = p.month.ok
+      ? tile('本月预计', usd(p.month.projUsd, p.month.used.est), `已用 ${usd(p.month.used.usd, p.month.used.est)}`)
+      : tile('本月', usd(p.month.used.usd, p.month.used.est), '月初');
+  }
+  // 订阅回本按近 30 天滚动用量算：订阅周期不是自然月
+  const d30 = d.d30;
   let t3;
-  if (price > 0) t3 = tile('订阅回本', mult(p.month.used.usd, price), `月费 $${price}`, p.month.used.usd >= price ? 'good' : '');
+  if (price > 0) t3 = tile('订阅回本', mult(d30.usd, price), `近 30 天 · 月费 $${price}`, d30.usd >= price ? 'good' : '');
   else if (price === 0) t3 = tile('套餐', 'Free', '无订阅费');
   else t3 = tile('近 5 小时', usd(p.five.usd, p.five.est), fmtTok(p.five.tokens));
   return t1 + t2 + t3;
 }
 
-// 没有额度数据的 Agent：第二行改显示套餐月费 + 本月折算（订阅回本倍数）
+// 没有额度数据的 Agent：第二行改显示套餐月费 + 近 30 天折算（订阅回本倍数）
 function planLine(d) {
   const pl = d.plan;
-  const used = d.proj.month.used;
-  const month = `本月折算 <b>${usd(used.usd, used.est)}</b>`;
+  const used = d.d30;
+  const month = `近 30 天折算 <b>${usd(used.usd, used.est)}</b>`;
   if (!pl) return `<span class="kd">${month}</span>`;
   if (pl.usd > 0) return `<span class="kd">${esc(pl.name)} $${pl.usd}/月 · ${month} <b>(${mult(used.usd, pl.usd)})</b></span>`;
   return `<span class="kd">${esc(pl.name)} · ${month}</span>`;

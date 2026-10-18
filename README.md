@@ -82,7 +82,7 @@ npm install && npx tauri build # 生成 NSIS 安装包：target/release/bundle/n
 
 - **Claude 的 5h / 周额度只有命令行版 Claude Code 会触发钩子，桌面 App 不会**——这是 Claude Code 桌面版的限制。数据超过 10 分钟未更新时会提示“额度数据更新于 x 前”。
 - Antigravity 只有 5 小时窗口，没有周额度。
-- WorkBuddy 的积分余额只在云端，本机日志里没有；界面显示“月费 + 本月折算”代替。
+- WorkBuddy 的积分余额只在云端，本机日志里没有；界面显示“月费 + 近 30 天折算”代替。
 - 仅在 Windows 上测试。图标提取、Antigravity 额度、钩子管理里的注册表 / PowerShell 部分只在 Windows 可用，其他平台会回退。
 - 官方图标不随仓库分发：运行时从本机已安装的应用提取并缓存到 `%APPDATA%\token-widget\icons`，找不到就显示首字母徽标；仅供本地使用。
 

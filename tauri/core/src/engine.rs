@@ -20,6 +20,8 @@ const HOUR_KEEP_DAYS: i64 = 14;
 const DISCOVER_EVERY: i64 = 20 * 1000;
 const HOUR_MS: i64 = 3_600_000;
 const DAY_MS: f64 = 86_400_000.0;
+/// 周额度已用百分比低于它时不反推额度（整数百分比的舍入误差太大）
+const QUOTA_MIN_PCT: f64 = 10.0;
 
 // ---------------------------------------------------------------- 时间键（本地时区）
 fn local(ms: i64) -> chrono::DateTime<Local> {
@@ -615,7 +617,15 @@ impl Engine {
         let w_ok = w_frac >= 0.04; // 周期刚开始时外推不可靠
         let used_pct = sec.and_then(|s| s.get("used_percent")).and_then(Value::as_f64);
         let window = kind == "window";
+        // 折算额度：用窗口内已用金额 ÷ 已用百分比反推整周额度，再乘 52/12 得月度额度。
+        // 订阅周期与自然月不对应，所以不用自然月；百分比是整数，低于 10% 时误差过大，不估算
+        let quota_week = match used_pct {
+            Some(p) if window && p >= QUOTA_MIN_PCT && w_used.usd > 0.0 => Some(w_used.usd / (p / 100.0)),
+            _ => None,
+        };
         let week = json!({
+            "quotaWeekUsd": quota_week,
+            "quotaMonthUsd": quota_week.map(|q| q * 52.0 / 12.0),
             "kind": kind, "start": w_start, "end": w_end, "frac": w_frac, "ok": w_ok, "used": slim(&w_used),
             "projUsd": if w_ok { json!(w_used.usd / w_frac) } else { Value::Null },
             "projTokens": if w_ok { json!(w_used.tokens as f64 / w_frac) } else { Value::Null },
