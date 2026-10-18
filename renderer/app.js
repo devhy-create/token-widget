@@ -178,12 +178,15 @@ function tilesHtml(d) {
       ? tile('本月预计', usd(p.month.projUsd, p.month.used.est), `已用 ${usd(p.month.used.usd, p.month.used.est)}`)
       : tile('本月', usd(p.month.used.usd, p.month.used.est), '月初');
   }
-  // 订阅回本按近 30 天滚动用量算：订阅周期不是自然月
+  // 订阅回本按近 30 天滚动用量算（订阅周期不是自然月），只占一行小字，不再单独占一格；
+  // 此时上面两格各占一半宽
   const d30 = d.d30;
-  let t3;
-  if (price > 0) t3 = tile('订阅回本', mult(d30.usd, price), `近 30 天 · 月费 $${price}`, d30.usd >= price ? 'good' : '');
-  else if (price === 0) t3 = tile('套餐', 'Free', '无订阅费');
-  else t3 = tile('近 5 小时', usd(p.five.usd, p.five.est), fmtTok(p.five.tokens));
+  if (price > 0) {
+    const good = d30.usd >= price ? ' good' : '';
+    const note = `<div class="tnote">订阅回本 <b class="${good}">${mult(d30.usd, price)}</b> · 近 30 天 ${usd(d30.usd, d30.est)} / 月费 $${price}</div>`;
+    return `<div class="tiles2">${t1 + t2}</div>${note}`;
+  }
+  const t3 = price === 0 ? tile('套餐', 'Free', '无订阅费') : tile('近 5 小时', usd(p.five.usd, p.five.est), fmtTok(p.five.tokens));
   return t1 + t2 + t3;
 }
 

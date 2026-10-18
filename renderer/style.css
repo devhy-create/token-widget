@@ -141,6 +141,11 @@ body.is-pill #panel { opacity: 0; pointer-events: none; transition: opacity 0.12
 .tile .s { color: var(--fg2); font-size: 11px; }
 .tile .s .hot { color: var(--hot); font-weight: 600; }
 .tile .v.good { color: var(--ok); }
+/* 有订阅月费时：两格各占一半宽，订阅回本只是下面一行小字 */
+.tiles2 { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tnote { grid-column: 1 / -1; color: var(--fg2); font-size: 11px; padding: 0 4px; }
+.tnote b { color: var(--fg); font-weight: 600; }
+.tnote b.good { color: var(--ok); }
 .rings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .big { background: var(--fill); border-radius: 14px; padding: 9px 11px; display: flex; align-items: center; gap: 10px; }
 .big svg { width: 42px; height: 42px; transform: rotate(-90deg); flex: none; }
