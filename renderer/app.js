@@ -165,7 +165,10 @@ function tilesHtml(d) {
   const wkTitle = p.week.kind === 'window' ? '每周' : '本周';
   const pctp = p.week.pctProj != null ? ` · <span class="${p.week.pctProj >= 100 ? 'hot' : ''}">${Math.round(p.week.pctProj)}%</span>` : '';
   const t1 = tile(wkTitle, usd(p.week.used.usd, p.week.used.est), p.week.ok ? `预计 ${usd(p.week.projUsd, p.week.used.est)}${pctp}` : '刚开始');
-  const t2 = tile('本月', usd(p.month.used.usd, p.month.used.est), p.month.ok ? `预计 ${usd(p.month.projUsd, p.month.used.est)}` : '月初');
+  // 本月卡片：主数字显示预计整月用量，已用金额放副标题；月初外推不可靠时退回显示已用
+  const t2 = p.month.ok
+    ? tile('本月预计', usd(p.month.projUsd, p.month.used.est), `已用 ${usd(p.month.used.usd, p.month.used.est)}`)
+    : tile('本月', usd(p.month.used.usd, p.month.used.est), '月初');
   let t3;
   if (price > 0) t3 = tile('订阅回本', mult(p.month.used.usd, price), `月费 $${price}`, p.month.used.usd >= price ? 'good' : '');
   else if (price === 0) t3 = tile('套餐', 'Free', '无订阅费');
