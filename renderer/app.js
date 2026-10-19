@@ -352,12 +352,14 @@ function hookHtml(h) {
   const txt = {
     none: '本地日志里没有 Claude 的 5h / 周额度，需要给 Claude Code 配一个 statusLine 钩子。启用前会自动备份 settings.json。注意：只有命令行版 Claude Code 会触发钩子，桌面 App 不会。',
     ours: '已启用。命令行版 Claude Code 每次刷新状态栏就会更新额度；桌面 App 不会触发，只用桌面版时数字会停在上次。',
+    stale: '检测到旧版钩子，它指向的文件已经不存在，Claude 的 5h / 周额度不会再更新。点“修复”改用本程序自带的钩子（会先备份 settings.json）。',
     other: '检测到你已有自己的 statusLine，为避免覆盖不会自动修改。可在其脚本里把 Claude Code 传入的 JSON 转给 agent-monitor.exe --statusline 合并。',
     unreadable: '~/.claude/settings.json 读取失败，为安全起见不修改。',
   }[h.state];
   let btn = '';
   if (h.state === 'none') btn = '<button class="sbtn" data-hook="1">启用</button>';
   else if (h.state === 'ours') btn = '<button class="sbtn" data-hook="0">停用</button>';
+  else if (h.state === 'stale') btn = '<button class="sbtn" data-hook="1">修复</button>';
   return `<div class="sh">Claude 额度（5h / 周）</div><div class="sg"><div class="srow hookrow"><span class="snote">${txt}</span>${btn}</div></div>`;
 }
 

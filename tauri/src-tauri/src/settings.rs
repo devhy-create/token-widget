@@ -81,6 +81,16 @@ fn is_ours(command: &str) -> bool {
     command.contains("claude-statusline.js") || (command.contains("--statusline") && command.contains("agent-monitor"))
 }
 
+/// 命令里引号包起来的 .js / .exe 路径是否有不存在的：旧版 v0.1 的脚本被删（如移除 Electron 版后）
+/// 或程序挪了位置，钩子就一直调不起来，Claude 额度会停在旧值
+fn command_target_missing(command: &str) -> bool {
+    // 引号把命令切成奇偶段，奇数段是被引号包住的内容
+    command.split('"').skip(1).step_by(2).any(|seg| {
+        let s = seg.to_ascii_lowercase();
+        (s.ends_with(".js") || s.ends_with(".exe")) && !Path::new(seg).exists()
+    })
+}
+
 fn hook_state() -> Value {
     match read_claude_settings(&claude_settings_path()) {
         Read::Unreadable => json!({ "state": "unreadable" }),
@@ -88,7 +98,8 @@ fn hook_state() -> Value {
             None => json!({ "state": "none" }),
             Some(sl) => {
                 let cmd = sl.get("command").and_then(Value::as_str).unwrap_or("");
-                json!({ "state": if is_ours(cmd) { "ours" } else { "other" } })
+                let state = if !is_ours(cmd) { "other" } else if command_target_missing(cmd) { "stale" } else { "ours" };
+                json!({ "state": state })
             }
         },
     }
@@ -118,7 +129,7 @@ pub fn set_claude_hook(on: bool) -> Value {
         backup_claude_settings(&f);
         json.insert("statusLine".into(), json!({ "type": "command", "command": format!("\"{exe}\" --statusline") }));
     } else {
-        if state != "ours" {
+        if state != "ours" && state != "stale" {
             return st;
         }
         backup_claude_settings(&f);
@@ -233,4 +244,21 @@ pub fn set_settings(sh: &Sh, patch: &Value) -> Value {
     window::push(sh);
     crate::menu::refresh_tray(sh);
     get_settings(sh)
+}
+
+#[cfg(test)]
+mod hook_tests {
+    use super::*;
+
+    #[test]
+    fn missing_target_is_detected() {
+        // 旧版 v0.1 的 node 脚本已被删：钩子失效
+        assert!(command_target_missing("node \"Z:/not/exist/claude-statusline.js\""));
+        assert!(command_target_missing("\"Z:/not/exist/agent-monitor.exe\" --statusline"));
+        // 文件存在（用测试进程自己的 exe）：正常
+        let exe = std::env::current_exe().unwrap().to_string_lossy().replace('\\', "/");
+        assert!(!command_target_missing(&format!("\"{exe}\" --statusline")));
+        // 没有引号包住的路径：不判断
+        assert!(!command_target_missing("agent-monitor --statusline"));
+    }
 }
